@@ -1,0 +1,414 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+    01005 Advanced Engineering Mathematics 1
+</title>
+    <link href="/bundles_css_general?v=mCt0xLH6ZVm097AMT4IZXI_8YhGCBjBIv-CzzPZWduw1" rel="stylesheet"/>
+
+    <script src="/bundles_js_general?v=m944kgjFG7-r2HFwxi7Q_xDuvGXt8MWkcxYxVH_TSmE1"></script>
+
+
+
+
+    <script>
+        $(function () {
+            $("[data-open-dialog]").on('click touchstart', function () {
+                var me = $(this);
+                var bs = $("#" + me.data("open-dialog"));
+                bs.modal({ show: true, backdrop: true });
+            });
+        });
+
+        function getCookie(cname) {
+            var name = cname + "=";
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var ca = decodedCookie.split(';');
+            for (var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+        function setCookieExHours(cname, cvalue, exhours) {
+            var d = new Date();
+            d.setTime(d.getTime() + (exhours * 60 * 60 * 1000));
+            var expires = "expires=" + d.toUTCString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+        }
+
+        function setCookie(c_name, value, exdays) {
+            var exdate = new Date();
+            exdate.setDate(exdate.getDate() + exdays);
+            var c_value = escape(value) + ((exdays == null) ? "" : "; expires=" + exdate.toUTCString());
+            document.cookie = c_name + "=" + c_value + ";path=/;";
+        }
+
+        function setLanguage(language) {
+            setCookie('{DTUCoursesPublicLanguage}', language, 3650);
+            $.ajax("/unsetLanguage", {
+                method:"POST"
+            }).done(function () { location.reload(); })
+        }
+
+        function alertBox(message) {
+            alert(message);
+        }
+    </script>
+
+
+    <style>
+        #pagecontents > div:nth-child(2):not(:last-child) {
+            font-weight: bold;
+            color: #b20000;
+        }
+    </style>
+    <style>
+        .information > table > tbody > tr > td {
+            padding-top: 12px;
+            vertical-align: top;
+        }
+
+            .information > table > tbody > tr > td:first-child {
+                width: 30%;
+            }
+
+        .bar {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+            .bar:first-child {
+                margin-top: 0px;
+            }
+
+        .box {
+            padding-bottom: 10px;
+        }
+
+        .popover {
+            font-size: 0.9em;
+        }
+
+            .popover .popover-title {
+                font-size: 1em;
+            }
+
+            .popover input {
+                width: 100%;
+            }
+
+        .CourseLink {
+            display: inline-block;
+        }
+    </style>
+    <script>
+        var holdings = [
+        ];
+
+        var lines = [
+'Basic Natural Science Courses, Architectural Engineering','Basic Natural Science Courses, Electrical Engineering','Basic Natural Science Courses, Human Life Science Engineering','Basic Natural Science Courses, Physics and Nanotechnology','Basic Natural Science Courses, Quantitative Biology and Disease Modelling','Basic Natural Science Courses, Earth and Space Physics and Engineering','Basic Natural Science Courses, Data Science and Management','Basic Natural Science Courses, Biotechnology','Basic Natural Science Courses, Mechanical Engineering','Basic Natural Science Courses, Mathematics and Technology','Basic Natural Science Courses, Artificiel Intelligence and Data','Basic Natural Science Courses, Design of Sustainable Energy Systems','Basic Natural Science Courses, Cybertechnology','Basic Natural Science Courses, Environmental Engineering','Basic Natural Science Courses, Software Technology'        ];
+                    var collectedTooltips = {};
+                    function getCourseTitle() {
+                        var courseCode =  $(this).text();
+                        var url = '/course/getTitle/[COURSECODE]'.replace("[COURSECODE]", courseCode);
+                        if (!collectedTooltips.hasOwnProperty(courseCode)) {
+                            collectedTooltips[courseCode] = courseCode;
+                $.ajax(url, {
+                                async: false,
+                    success: function (data) {
+                                    if (data.title != null) {
+                                        collectedTooltips[courseCode] = data.title;
+                                    }
+                                }
+                            });
+                        }
+                        return collectedTooltips[courseCode];
+                    }
+        $(document).on('click', function (e) {
+            $('[data-toggle="popover"],[data-original-title]').each(function () {
+                            //the 'is' for buttons that trigger popups
+                            //the 'has' for icons within a button that triggers a popup
+                            if (!$(this).is(e.target) && $(this).has(e.target).length === 0 && $('.popover').has(e.target).length === 0) {
+                                (($(this).popover('hide').data('bs.popover') || {}).inState || {}).click = false  // fix for BS 3.3.6
+                }
+
+                        });
+                    });
+        $(function () {
+            $(".permalink").popover({
+                            placement: "left",
+                title: "Permalinks",
+                content: function(){
+                                return $("#permalinkBox").html();
+                            },
+                trigger: "click",
+                html:true
+            });
+                        if (lines.length != 0) {
+                            var groups = [];
+                            for (var i = 0 ; i < lines.length; i++) {
+                                var line = lines[i];
+                                if (line == "") {
+                                    continue;
+                                }
+                                var found = false;
+                                var key = line.split(",")[0];
+                                var me = { id: key, values: [line] };
+
+                            for (var j = 0; j < groups.length; j++) {
+                                if (groups[j].id == me.id) {
+                                    groups[j].values.push(me.values[0]); found = true;
+                                }
+                            }
+                            if (!found) {
+                                groups.push(me);
+                            }
+                        }
+
+                        var str = "";
+                $(groups).each(function () {
+                            if (this.values.length > 3) {
+                                str += "<span class='expander' style='color:#b20000;cursor:pointer'>" + this.id + ", see more<br/></span>";
+                        $(this.values).each(
+                            function () {
+                                    str += "<span style='display:none'>" + this + "<br/></span>";
+                                });
+                            } else {
+                        $(this.values).each(
+                            function () {
+                                    str += "<span>" + this + "<br/></span>";
+                                });
+                            }
+                        });
+                $("#studiebox").html(str);
+                $(".expander").click(function () {
+                            var node = $(this).nextUntil(".expander").show();
+                    $(this).hide()
+                });
+                    }
+
+                    if (holdings.length != 0) {
+                        var str = "<td>Course holdings</td><td>";
+                        for (var i = 0; i < holdings.length; i++) {
+                            str += "<div>" + holdings[i][0] + (holdings[i][1]!=null? "<br/>" + holdings[i][1]:"") + "</div>";
+                        }
+
+                        str += "</td>";
+                $("#courseHoldingsBox").html(str);
+                    }
+
+            $(".CourseLink").tooltip({
+                        title:getCourseTitle,
+                trigger:"hover focus"
+            });
+            $(document).on("click", ".inBasket", function () {
+                        var e = $(this);
+                        var courseCode = e.data("coursecode");
+                        if (e.data("musttake") === "True") {
+                            alertBox("Can't delete courses that MUST be taken from the basket.");
+                            return
+                        }
+                $.ajax("/deleteCourseFromBasket",{
+                            method: "POST",
+                    data: {
+                                courseCode : courseCode
+                    },
+                    success: function (data) {
+                                switch (parseInt(data)) {
+                                    case 0:
+                                        e.attr("src", "/Content/Images/basket_empty.png");
+                                        e.toggleClass("addToBasket");
+                                        e.toggleClass("inBasket");
+                                        break;
+                                    case 1:
+                                        alertBox("Can't delete courses that MUST be taken from the basket.");
+                                        break;
+                                    case 2:
+                                        e.attr("src", "/Content/Images/basket_empty.png");
+                                        e.toggleClass("addToBasket");
+                                        e.toggleClass("inBasket");
+                                        alertBox("Can't delete courses that are not in the basket.");
+                                        break;
+                                }
+                            },
+                    error: function (jqXHR, textStatus, errorThrown) {
+                                alertBox("Failed to delete the course from the basket.");
+                            }
+                        });
+                    });
+
+            $(document).on("click", ".addToBasket", function () {
+                        var e = $(this);
+                        var courseCode = e.data("coursecode");
+                $.ajax(
+                    "/addToBasket",
+                    {
+                            data:{
+                                courseCode: courseCode
+                            },
+                        method:"POST",
+                        success: function (data) {
+                                switch (parseInt(data)) {
+                                    case 0:
+                                        e.attr("src", "/Content/Images/basket_filled.png");
+                                        e.toggleClass("addToBasket");
+                                        e.toggleClass("inBasket");
+                                        break;
+                                    case 1:
+                                        alertBox("Can't add this course to the plan cause it is already in it.");
+                                        break;
+                                }
+                            }
+                        }
+                );
+                    })
+        })
+    </script>
+
+    <link rel="shortcut icon" href="/Content/Images/favicon.ico" />
+
+</head>
+<body>
+    <div class="dturedbackground">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="pull-right">
+                        <span><a href="javascript:setLanguage('da-DK')">Dansk</a></span>
+                        <span class="seperator">|</span>
+                            <span><a href="/login/login">Login</a></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="dtugreybackground">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
+                        <a href="/search">
+                            <img class="pull-left logo-img" style="padding:10px 0" src="/Content/Images/dtulogo_colour.png" />
+                        </a>
+                        <span class="mofoclass pull-right" style="position:absolute; bottom:1px; right: 13px;">
+                            <ul class="nav nav-tabs hidden-print">
+                                <li role="presentation" class="active"><a href="/search">Course search</a></li>
+                                <li role="presentation"><a href="/course/gotoStudyplanner">Study Planner</a></li>
+                            </ul>
+                        </span>
+                        <div class="clearfix"></div>
+                   </div>
+            </div>
+        </div>
+    </div>
+    <div class="container body-content">
+
+<ul class="nav nav-tabs hidden-print">
+    <li role="presentation" class="active"><a href="#">01005</a></li>
+        <li role="presentation"><a href="/course/01005/info">Information</a></li>
+</ul>
+<div class="row  hidden-print">
+    <div class="col-xs-12">
+
+        <span class="glyphicon glyphicon-print pull-right clickable" onclick="window.print()" style="padding-left:3px;font-size:16px"></span>
+        <span class="glyphicon glyphicon-link pull-right permalink clickable" style="padding-left:3px;font-size:16px"></span>
+    </div>
+</div>
+<div id="pagecontents" name="pagecontents"><div class="row"><div class="col-xs-8"><h2 style="font-family:verdana; font-size:18px; margin-bottom: 10px;">
+Test0 Matematik i Måneby 1</h2></div><div class="col-xs-4"><h2 style="font-family:verdana; font-size:18px; margin-bottom: 10px;text-align:right">
+2023/2024</h2></div></div><div class="row"><div class="col-xs-12">This is an announcement.</div></div><div class="row"><div class="col-md-6 col-sm-12 col-xs-12"><div class="box information"><div class="bar">Course information</div><table><tbody><tr><td><label>Danish title</label></td><td>Matematik 1</td></tr><tr><td><label>Participants restrictions</label></td><td>Minimum 9 Maximum: 15</td></tr> <tr><td><label>Mandatory Prerequisites</label></td><td><a href=\"http://kurser.dtu.dk/course/22600\" class=\"CourseLink\" data-original-title=\"\" title=\"\">22600</a> , Fabrication of micro- and nano\nstructures</td></tr></td></tr><tr><td><label>Department involved</label></td><td><td><div title=\"01 Department of Applied Mathematics and Computer Science(15%)\">\n01 Department of Applied Mathematics and Computer\nScience</div></td></tr></td></tr><tr><td><label>Previous Course</label></td><td>12345</td></tr><tr><td><label>External Institution</label></td><td><div>DHI Water &amp; Environment</div></td></tr> <tr><td><label>Course co-responsible</label></td><td><a class=\"menulink\" href=\"http://www.dtu.dk/Service/Telefonbog.aspx?id=9644&amp;type=person&amp;lg=showcommon\">\nKarsten Schmidt</a> , <a href=\"mailto:ksch@dtu.dk\">ksch@dtu.dk</a><br><a class=\"menulink\" href=\"http://www.dtu.dk/Service/Telefonbog.aspx?id=1968&amp;type=person&amp;lg=showcommon\">\nMichael Pedersen</a> , Lyngby Campus, Building 303B, Ph.\n(+45)&nbsp;4525 3012 , <a href=\"mailto:micp@dtu.dk\">micp@dtu.dk</a><br></td></tr><tr><td><label>Participants restrictions</label></td><td>Minimum 9 Maximum: 15</td></tr>
+<tr><td><label>Mandatory Prerequisites</label></td><td><a href=\"http://kurser.dtu.dk/course/22600\" class=\"CourseLink\" data-original-title=\"\" title=\"\">22600</a> , Fabrication of micro- and nano\nstructures</td></tr></td></tr><tr><td><label>Department involved</label></td><td><td><div title=\"01 Department of Applied Mathematics and Computer Science(15%)\">\n01 Department of Applied Mathematics and Computer\nScience</div></td></tr></td></tr>
+<tr><td><label>Previous Course</label></td><td>12345</td></tr><tr><td><label>External Institution</label></td><td><div>DHI Water &amp; Environment</div></td></tr><tr><td><label>Course co-responsible</label></td><td><a class=\"menulink\" href=\"http://www.dtu.dk/Service/Telefonbog.aspx?id=9644&amp;type=person&amp;lg=showcommon\">\nKarsten Schmidt</a> , <a href=\"mailto:ksch@dtu.dk\">ksch@dtu.dk</a><br><a class=\"menulink\" href=\"http://www.dtu.dk/Service/Telefonbog.aspx?id=1968&amp;type=person&amp;lg=showcommon\">\nMichael Pedersen</a> , Lyngby Campus, Building 303B, Ph.\n(+45)&nbsp;4525 3012 , <a href=\"mailto:micp@dtu.dk\">micp@dtu.dk</a><br></td></tr><tr><td><label>Language of instruction</label></td><td>Danish</td></tr><tr><td><label>Point( ECTS )</label></td><td>20</td></tr><tr><td><label>Course type</label></td><td><div>BSc</div><div id="studiebox" /></td></tr></tbody></table><table><tbody><tr><td><label><a href="http://kurser.dtu.dk/schedule/01005/2023-2024">Schedule</a></label></td><td>Autumn and Spring
+<br />
+ Course is given in three different schedules dependent on study
+programme.
+<br />
+Scheme A: E1A, E2 og F1A, F2 Scheme B: E3A, E4 og F3A, F4</td></tr><tr><td><label>Location</label></td><td>Campus Lyngby</td></tr><tr><td><label>Scope and form</label></td><td>Per week: 2 video lectures, 3h tutorials and 3h groupwork.
+Moreover thematic exercises and projectwork in some
+weeks.</td></tr><tr><td><label>Duration of Course</label></td><td>13 weeks + 13 weeks</td></tr><tr><td><label><a href="https://www.inside.dtu.dk/en/undervisning/regler/regler-for-eksamen/eksamensdatoer">
+Date of examination</a></label></td><td>Decide with teacher, Closing tests: Special day: Click
+"Date of examination" to the left to see DTU's
+examination timetable</td></tr><tr><td><label>Type of assessment</label></td><td>Written examination and reports
+<br />
+ 4 parts equally weighted: 1) 7 homework assignments, 2) Tests in
+fall curriculum, 3) 3-week project exercise and 4) Tests in spring
+curriculum. Precise description:
+http://01005.compute.dtu.dk/Info-Eksamensregler</td></tr><tr><td><label>Exam duration</label></td><td>Written exam: 3 hours
+<br />
+ 1-hour current tests and 3-hours closing tests</td></tr><tr><td><label>Aid</label></td><td>All Aid :
+<p class="normal">For a precise description:
+<br /><a href="http://01005.compute.dtu.dk/Info-Eksamensregler">http:/​/​01005.compute.dtu.dk/​Info-Eksamensregler</a></p></td></tr><tr><td><label>Evaluation</label></td><td>7 step scale , external examiner</td></tr><tr><td><label>Not applicable together with</label></td><td><a href="http://kurser.dtu.dk/course/01006" class="CourseLink">01006</a> /
+<a href="http://kurser.dtu.dk/course/01008" class="CourseLink">01008</a> /
+<a href="http://kurser.dtu.dk/course/01015" class="CourseLink">01015</a> /
+<a href="http://kurser.dtu.dk/course/01016" class="CourseLink">01016</a></td></tr></tbody></table><table><tbody><tr><td><label>Responsible</label></td><td><a class="menulink" href="http://www.dtu.dk/Service/Telefonbog.aspx?id=9656&amp;type=person&amp;lg=showcommon">
+Ulrik Engelund Pedersen</a> , Lyngby Campus, Building 303B, Ph.
+(+45) 4525 5203 , <a href="mailto:uepe@dtu.dk">uepe@dtu.dk</a><br /></td></tr><tr><td><label>Department</label></td><td title="01 Department of Applied Mathematics and Computer Science(100%)">
+01 Department of Applied Mathematics and Computer Science</td></tr><tr><td><label>Home page</label></td><td><a class="menulink" href="http://01005.compute.dtu.dk/">http://01005.compute.dtu.dk/</a></td></tr><tr><td><label>Registration Sign up</label></td><td><div>At the Studyplanner</div></td></tr><tr><td><label>Green challenge participation</label></td><td>Please contact the teacher for information on whether this
+course gives the student the opportunity to prepare a project that
+may participate in DTU´s Study Conference on sustainability,
+climate technology, and the environment (GRØN DYST). More infor
+<a class="menulink" href="http://www.groendyst.dtu.dk/english">http://www.groendyst.dtu.dk/english</a></td></tr></tbody></table></div></div><div class="col-md-6 col-sm-12 col-xs-12"><div class="box"><div class="bar">General course objectives</div>
+The course content is the mathematical basis for a broad range of
+technical fields and also provides a starting point for further
+studies in mathematics and applied mathematics. The dominating
+theme of the course is linearity. The goal is to give students the
+ability to employ fundamental tools of mathematics in theoretical
+studies as well as in applied thematic exercises and projects. The
+use of modern computer software supports both of these aspects.
+<div class="bar">Learning objectives</div>
+A student who has met the objectives of the course will be able to:
+
+<ul><li>use the algeraic and the geometric representation of complex
+numbers including the complex exponential function.</li><li>use matrix algebra and Gaussian elimination for solving systems
+of linear equations.</li><li>analyse and explain the linear structure of solution sets in
+vector spaces.</li><li>perform calculations with the elementary functions including
+their inverse functions.</li><li>use Taylor's formulas for approximizations and limits.</li><li>solve elementary first and second order differential equations
+and systems of differential equations.</li><li>calculate extremas for multivariate functions, especially on
+domains with boundary.</li><li>parameterise elementary curves, surfaces and massive solids and
+calculate elementary curve, surface and volume integrals.</li><li>use Gauss's and Stokes's theorems in simple
+applications.</li><li>use mathematical terminology and reasoning in oral as well as
+written presentation.</li><li>coordinate joint work in groups around thematic exercises and
+applications.</li><li>use computer algebraic systems (at present Maple) for solving
+and visualisation of mathematical problems.</li></ul><div class="bar">Content</div>
+Linear equations and linear maps. Matrix algebra. Vektor spaces.
+Eigenvalue problems. Symmetric and orthogonal matrices. Complex
+numbers. Linear differential equations. Standard functions.
+Functions of one and several real variables: linear approximations
+and partial derivatives, Taylor expansions and quadratic forms,
+extrema and level curves, line, surface and volume integrals.
+Vector fields, Gauss' and Stokes' theorem.
+<br />
+Applications of MAPLE in the above areas. Examples of applications
+in the engineering sciences.
+<div class="bar">Remarks</div>
+You can freely choose between following Scheme A or Scheme B
+<div class="bar">CourseLiterature</div>
+\nOnline content and electronic lecture notes \n<div class=\"bar\">Remarks</div>\nFrom the start of the course, you will be offered cleanroom safety\ntraining, and training sessions for use of specific cleanroom\ntools. This will take place Wednesdays 8-17, i.e. outside of the\nteaching modules. Hence, you should be able to reserve a number of\nWednesdays for those training sessions in addition to the regular\ncourse modules. You may consider those training sessions as part of\nthe homework for the course. The training sessions will be agreed\non an individual basis for all course students. In connection to\nthe hands-on training sessions, you will also have to do self-study\nof online materials regarding the appropriate use of specific tools\nand safety measures. Subsequently, your understanding of these\nmaterials will be evaluated through a number of quizzes, which must\nbe passed before the corresponding hands-on training can be agreed.\nDuring the mini-project phase, you must be prepared to be flexible\nregarding organization of your work, as availability of tools in\nthe cleanroom may require working outside of the scheduled course\nmodules. \n
+<div class="bar">Last updated</div>
+23. august, 2023</div></div></div></div>
+<div style="display:none" id="permalinkBox">
+    <div>Copy links for linking to this course description</div>
+    <div><b>Current version:</b><input type="text" value="https://kurser.dtu.dk/course/2023-2024/01005" /></div>
+    <div><b>Newest version:</b><input type="text" value="https://kurser.dtu.dk/course/01005" /></div>
+    <div><em>Current version</em> will always link to this exact version of the course.</div>
+    <div><em>Newest version</em> will link to the newest version of the course.</div>
+</div>
+
+
+
+
+
+    </div>
+</body>
+</html>
