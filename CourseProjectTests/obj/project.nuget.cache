@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "vU2/qQrrj90bBAhG5L8jAsBzx8gueKRCiZPiHhNyRlC1CZZNIxJb0U0QOUtXnjCbE2INEtsAgCKMbQEHDJsMSQ==",
+  "dgSpecHash": "VdvjhZa8CwD6NekVFin9oa3N8ZCh87si/32u+9EMHv82WK79j80hnh9zgsdyvg48397W7aROm4bXesH0SBx+RA==",
   "success": true,
-  "projectFilePath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
+  "projectFilePath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\BudoB\\.nuget\\packages\\coverlet.collector\\3.2.0\\coverlet.collector.3.2.0.nupkg.sha512",
     "C:\\Users\\BudoB\\.nuget\\packages\\coverlet.msbuild\\6.0.0\\coverlet.msbuild.6.0.0.nupkg.sha512",

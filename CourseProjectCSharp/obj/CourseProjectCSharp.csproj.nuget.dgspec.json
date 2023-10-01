@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {}
+    "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {}
   },
   "projects": {
-    "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {
+    "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj",
+        "projectUniqueName": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj",
         "projectName": "CourseProjectCSharp",
-        "projectPath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj",
+        "projectPath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj",
         "packagesPath": "C:\\Users\\BudoB\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\obj\\",
+        "outputPath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\BudoB\\AppData\\Roaming\\NuGet\\NuGet.Config"
