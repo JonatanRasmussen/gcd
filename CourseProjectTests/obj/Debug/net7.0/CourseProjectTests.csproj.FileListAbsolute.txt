@@ -208,3 +208,4 @@ c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectTests\ob
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectTests\obj\Debug\net7.0\CourseProjectTests.pdb
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectTests\obj\Debug\net7.0\CourseProjectTests.genruntimeconfig.cache
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectTests\obj\Debug\net7.0\ref\CourseProjectTests.dll
+c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectTests\obj\Debug\net7.0\CourseProjectTests.sourcelink.json

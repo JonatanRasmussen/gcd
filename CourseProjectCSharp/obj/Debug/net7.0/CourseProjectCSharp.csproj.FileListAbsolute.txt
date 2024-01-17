@@ -40,3 +40,4 @@ c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectCSharp\o
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectCSharp\obj\Debug\net7.0\CourseProjectCSharp.pdb
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectCSharp\obj\Debug\net7.0\CourseProjectCSharp.genruntimeconfig.cache
 c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectCSharp\obj\Debug\net7.0\ref\CourseProjectCSharp.dll
+c:\Users\BudoB\OneDrive\Dokumenter Tekst\Programmering\gcd\CourseProjectCSharp\obj\Debug\net7.0\CourseProjectCSharp.sourcelink.json
