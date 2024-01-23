@@ -30,16 +30,118 @@ public class AudioSystem
     }
 }
 
+public class SpellScript
+{
+    public Dictionary<TimeSpan, ISpellStrategy> Script { get; set; }
+
+    public SpellScript()
+    {
+        Script = new();
+    }
+
+    public List<ISpellStrategy> TriggerScriptedSpells(TimeSpan encounterTimer)
+    {
+        // TODO: Incomplete code
+        List<ISpellStrategy> triggeredSpells = new()
+        {
+            Script[encounterTimer]
+        };
+        return triggeredSpells;
+    }
+}
+
+public class CombatActor
+{
+    public CombatEncounter CombatEncounter { get; set; }
+    public CombatSystem CombatSystem { get; set; }
+    public CombatObject ActorObject { get; set; }
+    public List<ISpellStrategy> SpellQueue { get; set; }
+    public SpellScript? SpellScript { get; set; }
+    public CombatActor(CombatEncounter combatEncounter, CombatSystem combatSystem, CombatObject actorObject)
+    {
+        CombatEncounter = combatEncounter;
+        CombatSystem = combatSystem;
+        ActorObject = actorObject;
+        SpellQueue = new();
+        SpellScript = null;
+    }
+
+    public void RefreshSpellQueue(TimeSpan encounterTimer)
+    {
+        if (SpellScript == null)
+        {
+            ListenForPlayerInput();
+        }
+        else
+        {
+            List<ISpellStrategy> newSpells = SpellScript.TriggerScriptedSpells(encounterTimer);
+            SpellQueue.AddRange(newSpells);
+        }
+    }
+
+    public void ExecuteSpellQueue()
+    {
+        foreach (var spell in SpellQueue)
+        {
+            if (SpellCastIsValid(spell))
+            {
+                CombatSystem.StartAttack(ActorObject, new(), spell);
+            }
+        }
+    }
+
+    private static bool SpellCastIsValid(ISpellStrategy spell)
+    {
+        return true;
+    }
+
+    private static void ListenForPlayerInput()
+    {
+        //Empty;
+    }
+}
+
+public class CombatEncounter
+{
+    public CombatSystem CombatSystem { get; set; }
+    public List<CombatObject> CombatObjects { get; set; }
+    public List<CombatActor> CombatActors { get; set; }
+    public TimeSpan EncounterTimer { get; set; }
+    public TimeSpan UpdateInterval { get; set; } // Renamed from TickRate
+
+    public CombatEncounter(int updatesPerSecond)
+    {
+        CombatSystem = new();
+        CombatObjects = new();
+        CombatActors = new();
+        EncounterTimer = TimeSpan.Zero;
+        UpdateInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / updatesPerSecond);
+    }
+
+    public void ProcessCombat()
+    {
+        foreach (var combatActors in CombatActors)
+        {
+            combatActors.RefreshSpellQueue(EncounterTimer);
+            combatActors.ExecuteSpellQueue();
+        }
+        EncounterTimer += UpdateInterval;
+    }
+}
+
 public class CombatObject
 {
-    public bool Attackable { get; set; }
+    public bool IsInCombat { get; set; }
+    public bool HasHP { get; set; }
     public float MaxHP { get; set; }
     public float CurrentHP { get; set; }
+    public CombatObject? Parent { get; set; }
     public CombatObject()
     {
-        Attackable = false;
+        HasHP = false;
         MaxHP = 1;
         CurrentHP = MaxHP;
+        Parent = null;
     }
 
     public void RaiseMaxHP(float increasedHP)
@@ -75,23 +177,27 @@ public static class SpellTemplate
 }
 
 
-public interface ISpell
+public interface ISpellStrategy
 {
-    public void Resolve(CombatPacket packet);
+    string SpellID();
+    void Execute(CombatPacket packet);
 }
 
-public class Spell0000 : ISpell
+public class Spell0000 : ISpellStrategy
 {
-    public void Resolve(CombatPacket packet)
+    public string SpellID() => "Spell0000";
+
+    public void Execute(CombatPacket packet)
     {
-        ; // Empty
+        // Empty
     }
 }
 
-public class Spell0001 : ISpell
+public class Spell0001 : ISpellStrategy
 {
+    public string SpellID() => "Spell000";
     private readonly float damage = 10;
-    public void Resolve(CombatPacket packet)
+    public void Execute(CombatPacket packet)
     {
         SpellTemplate.DealDamage(packet.Targets, damage);
     }
@@ -102,7 +208,7 @@ public class CombatPacket
     public CombatObject? Attacker { get; set; } // Source
     public List<CombatObject> Targets { get; set; }
     public CombatObject? TargetLocation { get; set; } // For area attacks
-    public ISpell? Spell { get; set; }
+    public ISpellStrategy? Spell { get; set; }
     public bool AttackIsSuccesful { get; set; } // Determines if the attack was successful
     public AttackType AttackType { get; set; }
     // Additional fields as needed
@@ -178,12 +284,13 @@ public class CombatSystem
         combatManager = new CombatManager(10); // Example pool size
     }
 
-    public void StartAttack(CombatObject attacker, List<CombatObject> targets, AttackType attackType)
+    public void StartAttack(CombatObject attacker, List<CombatObject> targets, ISpellStrategy spell)
     {
         var packet = combatManager.RequestPacket();
         packet.Attacker = attacker;
         packet.Targets = targets;
-        packet.AttackType = attackType;
+        packet.Spell = spell;
+        packet.AttackType = AttackType.Melee;
 
         OnAttackStart?.Invoke(packet);
 
@@ -197,7 +304,7 @@ public class CombatSystem
 
     private void HandleAttack(CombatPacket packet)
     {
-        packet.Spell?.Resolve(packet);
+        packet.Spell?.Execute(packet);
         OnAttackAnimationStart?.Invoke(packet);
         // Handle animation logic
 
