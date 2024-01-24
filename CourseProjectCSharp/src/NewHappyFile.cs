@@ -30,19 +30,49 @@ public class AudioSystem
     }
 }
 
-public class SpellScript
+public class Position
 {
-    public Dictionary<TimeSpan, ISpellStrategy> Script { get; set; }
+    public float X { get; set; }
+    public float Y { get; set; }
+    public bool HasHitbox { get; set; }
 
-    public SpellScript()
+    public Position(float x, float y)
+    {
+        X = x;
+        Y = y;
+        HasHitbox = true;
+    }
+}
+
+public class SpellConfig
+{
+    public CombatObject? Attacker { get; set; } // Source
+    public List<CombatObject> Targets { get; set; }
+    public Position? TargetLocation { get; set; } // For area attacks
+    public ISpellStrategy? Spell { get; set; }
+
+    public SpellConfig()
+    {
+        Attacker = null;
+        Targets = new();
+        TargetLocation = null;
+        Spell = null;
+    }
+}
+
+public class SpellSchedule
+{
+    public Dictionary<TimeSpan, SpellConfig> Script { get; set; }
+
+    public SpellSchedule()
     {
         Script = new();
     }
 
-    public List<ISpellStrategy> TriggerScriptedSpells(TimeSpan encounterTimer)
+    public List<SpellConfig> TriggerScriptedSpells(TimeSpan encounterTimer)
     {
         // TODO: Incomplete code
-        List<ISpellStrategy> triggeredSpells = new()
+        List<SpellConfig> triggeredSpells = new()
         {
             Script[encounterTimer]
         };
@@ -50,47 +80,47 @@ public class SpellScript
     }
 }
 
-public class CombatActor
+public class SpellCasterObject
 {
     public CombatEncounter CombatEncounter { get; set; }
     public CombatSystem CombatSystem { get; set; }
     public CombatObject ActorObject { get; set; }
-    public List<ISpellStrategy> SpellQueue { get; set; }
-    public SpellScript? SpellScript { get; set; }
-    public CombatActor(CombatEncounter combatEncounter, CombatSystem combatSystem, CombatObject actorObject)
+    public List<SpellConfig> SpellConfigQueue { get; set; }
+    public SpellSchedule? SpellSchedule { get; set; }
+    public SpellCasterObject(CombatEncounter combatEncounter, CombatSystem combatSystem, CombatObject actorObject)
     {
         CombatEncounter = combatEncounter;
         CombatSystem = combatSystem;
         ActorObject = actorObject;
-        SpellQueue = new();
-        SpellScript = null;
+        SpellConfigQueue = new();
+        SpellSchedule = null;
     }
 
     public void RefreshSpellQueue(TimeSpan encounterTimer)
     {
-        if (SpellScript == null)
+        if (SpellSchedule == null)
         {
             ListenForPlayerInput();
         }
         else
         {
-            List<ISpellStrategy> newSpells = SpellScript.TriggerScriptedSpells(encounterTimer);
-            SpellQueue.AddRange(newSpells);
+            List<SpellConfig> newSpellConfigs = SpellSchedule.TriggerScriptedSpells(encounterTimer);
+            SpellConfigQueue.AddRange(newSpellConfigs);
         }
     }
 
     public void ExecuteSpellQueue()
     {
-        foreach (var spell in SpellQueue)
+        foreach (var spellConfig in SpellConfigQueue)
         {
-            if (SpellCastIsValid(spell))
+            if (SpellCastIsValid(spellConfig))
             {
-                CombatSystem.StartAttack(ActorObject, new(), spell);
+                CombatSystem.StartAttack(spellConfig);
             }
         }
     }
 
-    private static bool SpellCastIsValid(ISpellStrategy spell)
+    private static bool SpellCastIsValid(SpellConfig spellConfig)
     {
         return true;
     }
@@ -105,7 +135,7 @@ public class CombatEncounter
 {
     public CombatSystem CombatSystem { get; set; }
     public List<CombatObject> CombatObjects { get; set; }
-    public List<CombatActor> CombatActors { get; set; }
+    public List<SpellCasterObject> CombatActors { get; set; }
     public TimeSpan EncounterTimer { get; set; }
     public TimeSpan UpdateInterval { get; set; } // Renamed from TickRate
 
@@ -207,7 +237,7 @@ public class CombatPacket
 {
     public CombatObject? Attacker { get; set; } // Source
     public List<CombatObject> Targets { get; set; }
-    public CombatObject? TargetLocation { get; set; } // For area attacks
+    public Position? TargetLocation { get; set; } // For area attacks
     public ISpellStrategy? Spell { get; set; }
     public bool AttackIsSuccesful { get; set; } // Determines if the attack was successful
     public AttackType AttackType { get; set; }
@@ -216,18 +246,23 @@ public class CombatPacket
     public CombatPacket()
     {
         Targets = new();
-        ResetValues();
+        ResetPacket();
     }
 
-    public void ResetValues()
+    public void LoadSpellCastParameters(SpellConfig spellCastParameters)
     {
-        // Reset packet data
+        Attacker = spellCastParameters.Attacker;
+        Targets = spellCastParameters.Targets;
+        TargetLocation = spellCastParameters.TargetLocation;
+        Spell = spellCastParameters.Spell;
+    }
+
+    public void ResetPacket()
+    {
         Attacker = null;
         Targets.Clear();
         TargetLocation = null;
         Spell = null;
-        AttackIsSuccesful = false;
-        // Additional reset logic as needed
     }
 }
 
@@ -261,7 +296,7 @@ public class CombatManager
 
     public void ReleasePacket(CombatPacket packet)
     {
-        packet.ResetValues();
+        packet.ResetPacket();
         packetPool.Enqueue(packet); // Return packet to the pool
     }
 }
@@ -284,12 +319,13 @@ public class CombatSystem
         combatManager = new CombatManager(10); // Example pool size
     }
 
-    public void StartAttack(CombatObject attacker, List<CombatObject> targets, ISpellStrategy spell)
+    public void StartAttack(SpellConfig spellCastParameters)
     {
         var packet = combatManager.RequestPacket();
-        packet.Attacker = attacker;
-        packet.Targets = targets;
-        packet.Spell = spell;
+        packet.Attacker = spellCastParameters.Attacker;
+        packet.Targets = spellCastParameters.Targets;
+        packet.TargetLocation = spellCastParameters.TargetLocation;
+        packet.Spell = spellCastParameters.Spell;
         packet.AttackType = AttackType.Melee;
 
         OnAttackStart?.Invoke(packet);
