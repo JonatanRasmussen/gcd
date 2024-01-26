@@ -447,6 +447,6 @@ public class CombatSystem
     private bool DetermineHit(CombatPacket packet)
     {
         // Implement hit determination logic
-        return true; // Placeholder
+        return true; // PlaceholderTest
     }
 }
