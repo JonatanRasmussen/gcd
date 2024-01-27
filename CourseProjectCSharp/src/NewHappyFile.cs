@@ -30,6 +30,37 @@ public class AudioSystem
     }
 }
 
+public class Targeting
+{
+    public List<CombatObject> Targets { get; set; }
+    public Position? TargetLocation { get; set; } // For area attacks
+    public ITargetStrategy? TargetStrategy { get; set; } // For area attacks
+    public string SelectionInput { get; set; } // For area attacks
+
+    public Targeting()
+    {
+        Targets = new();
+        TargetLocation = null;
+        TargetStrategy = null;
+        SelectionInput = string.Empty;
+    }
+
+    public List<CombatObject> GetTargets()
+    {
+        return Targets;
+    }
+
+    public void SetTargets(List<CombatObject> combatObjects)
+    {
+        Targets = combatObjects;
+    }
+
+    public void FindTargets(List<CombatObject> combatObjects)
+    {
+        Targets = TargetStrategy?.Execute(SelectionInput, combatObjects) ?? new();
+    }
+}
+
 public class Position
 {
     public float X { get; set; }
@@ -44,11 +75,26 @@ public class Position
     }
 }
 
+public interface ITargetStrategy
+{
+    string SpellID();
+    List<CombatObject> Execute(string input, List<CombatObject> combatObjects);
+}
+
+public class TargetSelection0000 : ITargetStrategy
+{
+    public string SpellID() => "T0000";
+
+    public List<CombatObject> Execute(string input, List<CombatObject> combatObjects)
+    {
+        return combatObjects;
+    }
+}
+
 public class Spell
 {
     public CombatObject? Attacker { get; set; } // Source
-    public List<CombatObject> Targets { get; set; }
-    public Position? TargetLocation { get; set; } // For area attacks
+    public Targeting Targeting { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
     public TimeSpan ActivationTimeStamp { get; set; }
     public TimeSpan? InternalTimer { get; set; }
@@ -58,8 +104,7 @@ public class Spell
     public Spell()
     {
         Attacker = null;
-        Targets = new();
-        TargetLocation = null;
+        Targeting = new();
         SpellEffect = null;
         ActivationTimeStamp = TimeSpan.Zero;  //
         InternalTimer = null;  //Internal timer starts at 0, regardless of external timer
@@ -74,6 +119,21 @@ public class Spell
             TimeOffset = externalTimer;
         }
         InternalTimer = externalTimer - TimeOffset; //Keep internal timer at a fixed offset
+    }
+
+    public List<CombatObject> GetTargets()
+    {
+        return Targeting.GetTargets();
+    }
+
+    public void SetTargets(List<CombatObject> combatObjects)
+    {
+        Targeting.SetTargets(combatObjects);
+    }
+
+    public void FindTargets(List<CombatObject> combatObjects)
+    {
+        Targeting.FindTargets(combatObjects);
     }
 }
 
@@ -144,25 +204,24 @@ public class SpellSchedule
 
 public class SpellCasterObject
 {
-    public CombatEncounter CombatEncounter { get; set; }
     public CombatSystem CombatSystem { get; set; }
     public CombatObject Caster { get; set; }
     public List<Spell> SpellQueue { get; set; }
     public SpellSchedule? SpellSchedule { get; set; }
-    public SpellCasterObject(CombatEncounter combatEncounter, CombatSystem combatSystem, CombatObject caster)
+    public SpellCasterObject(CombatSystem combatSystem, CombatObject caster)
     {
-        CombatEncounter = combatEncounter;
         CombatSystem = combatSystem;
         Caster = caster;
         SpellQueue = new();
         SpellSchedule = null;
     }
 
-    public void ExecuteSpellQueue(TimeSpan encounterTimer)
+    public void ExecuteSpellQueue(List<CombatObject> combatObjects, TimeSpan encounterTimer)
     {
         RefreshSpellQueue(encounterTimer);
         foreach (var spell in SpellQueue)
         {
+            spell.FindTargets(combatObjects);
             if (SpellCastIsValid(spell))
             {
                 CombatSystem.StartAttack(spell);
@@ -228,7 +287,7 @@ public class CombatEncounter
     {
         foreach (var spellCasterObject in SpellCasterObjects)
         {
-            spellCasterObject.ExecuteSpellQueue(EncounterTimer);
+            spellCasterObject.ExecuteSpellQueue(CombatObjects, EncounterTimer);
         }
         EncounterTimer += UpdateInterval;
     }
@@ -311,33 +370,34 @@ public class Spell0001 : ISpellEffect
 public class CombatPacket
 {
     public CombatObject? Attacker { get; set; } // Source
+    public Targeting? Targeting { get; set; }
     public List<CombatObject> Targets { get; set; }
-    public Position? TargetLocation { get; set; } // For area attacks
-    public ISpellEffect? Spell { get; set; }
+    public ISpellEffect? SpellEffect { get; set; }
     public bool AttackIsSuccesful { get; set; } // Determines if the attack was successful
     public AttackType AttackType { get; set; }
     // Additional fields as needed
 
     public CombatPacket()
     {
+        Attacker = null;
+        Targeting = null;
         Targets = new();
-        ResetPacket();
+        SpellEffect = null;
     }
 
-    public void LoadSpellCastParameters(Spell spellCastParameters)
+    public void LoadSpell(Spell spell)
     {
-        Attacker = spellCastParameters.Attacker;
-        Targets = spellCastParameters.Targets;
-        TargetLocation = spellCastParameters.TargetLocation;
-        Spell = spellCastParameters.SpellEffect;
+        Attacker = spell.Attacker;
+        Targeting = spell.Targeting;
+        Targets = spell.GetTargets();
+        SpellEffect = spell.SpellEffect;
     }
 
     public void ResetPacket()
     {
         Attacker = null;
-        Targets.Clear();
-        TargetLocation = null;
-        Spell = null;
+        Targeting = null;
+        SpellEffect = null;
     }
 }
 
@@ -394,13 +454,12 @@ public class CombatSystem
         combatManager = new CombatManager(10); // Example pool size
     }
 
-    public void StartAttack(Spell spellCastParameters)
+    public void StartAttack(Spell spell)
     {
         var packet = combatManager.RequestPacket();
-        packet.Attacker = spellCastParameters.Attacker;
-        packet.Targets = spellCastParameters.Targets;
-        packet.TargetLocation = spellCastParameters.TargetLocation;
-        packet.Spell = spellCastParameters.SpellEffect;
+        packet.Attacker = spell.Attacker;
+        packet.Targeting = spell.Targeting;
+        packet.SpellEffect = spell.SpellEffect;
         packet.AttackType = AttackType.Melee;
 
         OnAttackStart?.Invoke(packet);
@@ -415,7 +474,7 @@ public class CombatSystem
 
     private void HandleAttack(CombatPacket packet)
     {
-        packet.Spell?.Execute(packet);
+        packet.SpellEffect?.Execute(packet);
         OnAttackAnimationStart?.Invoke(packet);
         // Handle animation logic
 
