@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 namespace GlobalNameSpace;
 
-using System;
-using System.Collections.Generic;
-
 public enum AttackType
 {
     Melee,
@@ -55,7 +52,7 @@ public class Targeting
         Targets = combatObjects;
     }
 
-    public void FindTargets(List<CombatObject> combatObjects)
+    public void SelectTargets(List<CombatObject> combatObjects)
     {
         Targets = TargetStrategy?.Execute(SelectionInput, combatObjects) ?? new();
     }
@@ -72,6 +69,48 @@ public class Position
         X = x;
         Y = y;
         HasHitbox = true;
+    }
+}
+
+public class TimeTracker
+{
+    public bool ActivationTimeStampIsNow { get; set; }
+    public TimeSpan? ActivationTimeStamp { get; set; }
+    public TimeSpan? Timer { get; set; }
+    public TimeSpan Offset { get; set; }
+
+    public TimeTracker()
+    {
+        ActivationTimeStampIsNow = false; //Cannot happen on first Update, as Timer is null
+        ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
+        Timer = null;  //Starts at 0, regardless of external timer
+        Offset = TimeSpan.Zero;
+    }
+
+    public void Update(TimeSpan externalTimer)
+    {
+        if (Timer == null)  //Run this the first time the method is called
+        {
+            Offset = externalTimer;
+            UpdateInternalTimer(externalTimer);
+        }
+        else if (ActivationTimeStamp != null) //Run this if an ActivationTimeStamp exists and is unreached
+        {
+            TimeSpan timeStart = Timer ?? TimeSpan.Zero; //before updating the internal timer
+            UpdateInternalTimer(externalTimer);
+            TimeSpan timeEnd = Timer ?? TimeSpan.Zero; //after updating the internal timer
+            ActivationTimeStampIsNow = ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd;
+        }
+        else  // Increment internal timer to keep up with updated external timer
+        {
+            UpdateInternalTimer(externalTimer);
+        }
+    }
+
+    private void UpdateInternalTimer(TimeSpan externalTimer)
+    {
+        // Increment internal timer to keep up with external timer
+        Timer = externalTimer - Offset;
     }
 }
 
@@ -96,9 +135,8 @@ public class Spell
     public CombatObject? Attacker { get; set; } // Source
     public Targeting Targeting { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
-    public TimeSpan ActivationTimeStamp { get; set; }
-    public TimeSpan? InternalTimer { get; set; }
-    public TimeSpan TimeOffset { get; set; }
+    public TimeTracker PreActivationTimer { get; set; }
+    public TimeTracker PostActivationTimer { get; set; }
     public bool IsActive { get; set; }
 
     public Spell()
@@ -106,19 +144,27 @@ public class Spell
         Attacker = null;
         Targeting = new();
         SpellEffect = null;
-        ActivationTimeStamp = TimeSpan.Zero;  //
-        InternalTimer = null;  //Internal timer starts at 0, regardless of external timer
-        TimeOffset = TimeSpan.Zero;  //TimeOffset == ActivationTimeStamp unless cast gets delayed
+        PreActivationTimer = new();
+        PostActivationTimer = new();
         IsActive = false;
     }
 
-    public void UpdateInternalTimers(TimeSpan externalTimer)
+    public void UpdatePreActivationTimer(TimeSpan externalTimer)
     {
-        if (InternalTimer == null)  //Run this the first time the method is called
+        PreActivationTimer.Update(externalTimer);
+        if (PreActivationTimer.ActivationTimeStampIsNow)
         {
-            TimeOffset = externalTimer;
+            IsActive = true;
         }
-        InternalTimer = externalTimer - TimeOffset; //Keep internal timer at a fixed offset
+    }
+
+    public void UpdatePostActivationTimer(TimeSpan externalTimer)
+    {
+        PreActivationTimer.Update(externalTimer);
+        if (PreActivationTimer.ActivationTimeStampIsNow)
+        {
+            IsActive = true;
+        }
     }
 
     public List<CombatObject> GetTargets()
@@ -131,74 +177,35 @@ public class Spell
         Targeting.SetTargets(combatObjects);
     }
 
-    public void FindTargets(List<CombatObject> combatObjects)
+    public void SelectTargets(List<CombatObject> combatObjects)
     {
-        Targeting.FindTargets(combatObjects);
+        Targeting.SelectTargets(combatObjects);
     }
 }
 
 public class SpellSchedule
 {
-    public List<Spell> SpellList { get; set; }
-    public TimeSpan? InternalTimer { get; set; }
-    public TimeSpan TimeOffset { get; set; }
-    private List<Spell> SpellsReadyForCasting { get; set; }
+    public List<Spell> ScheduledSpells { get; set; }
+    public List<Spell> SpellsReadyForCasting { get; set; }
 
     public SpellSchedule()
     {
-        SpellList = new();
-        InternalTimer = null;  //Internal timer starts at 0, regardless of external timer
-        TimeOffset = TimeSpan.Zero;  //Fixed offset from external timer. Is positive
+        ScheduledSpells = new();
         SpellsReadyForCasting = new();
     }
 
-    public List<Spell> FetchReadySpells(TimeSpan externalTimer)
+    public void UpdateSpellsReadyForCasting(TimeSpan externalTimer)
     {
-        UpdateSpellActivityStatus(externalTimer);
-        UpdateSpellTimers(externalTimer);
         SpellsReadyForCasting.Clear();
-        foreach (var spell in SpellList)
+        foreach (var spell in ScheduledSpells)
         {
+            spell.UpdatePreActivationTimer(externalTimer);
             if (spell.IsActive)
             {
                 SpellsReadyForCasting.Add(spell);
+                spell.IsActive = false;
             }
-        };
-        return SpellsReadyForCasting;
-    }
-
-    private void UpdateSpellActivityStatus(TimeSpan externalTimer)
-    {
-        TimeSpan timeStart = InternalTimer ?? TimeSpan.Zero; //before updating the internal timer
-        UpdateInternalTimer(externalTimer);
-        TimeSpan timeEnd = InternalTimer ?? TimeSpan.Zero; //after updating the internal timer
-        foreach (var spell in SpellList)
-        {
-            if (spell.ActivationTimeStamp >= timeStart && spell.ActivationTimeStamp < timeEnd)
-            {
-                spell.IsActive = true;
-            }
-        };
-    }
-
-    private void UpdateSpellTimers(TimeSpan externalTimer)
-    {
-        foreach (var spell in SpellList)
-        {
-            if (spell.IsActive)
-            {
-                spell.UpdateInternalTimers(externalTimer);
-            }
-        };
-    }
-
-    private void UpdateInternalTimer(TimeSpan externalTimer)
-    {
-        if (InternalTimer == null)  //Run this the first time the method is called
-        {
-            TimeOffset = externalTimer;
         }
-        InternalTimer = externalTimer - TimeOffset; //Keep internal timer at a fixed offset
     }
 }
 
@@ -221,7 +228,7 @@ public class SpellCasterObject
         RefreshSpellQueue(encounterTimer);
         foreach (var spell in SpellQueue)
         {
-            spell.FindTargets(combatObjects);
+            spell.SelectTargets(combatObjects);
             if (SpellCastIsValid(spell))
             {
                 CombatSystem.StartAttack(spell);
@@ -238,7 +245,8 @@ public class SpellCasterObject
         }
         else
         {
-            SpellQueue.AddRange(SpellSchedule.FetchReadySpells(encounterTimer));
+            SpellSchedule.UpdateSpellsReadyForCasting(encounterTimer);
+            SpellQueue.AddRange(SpellSchedule.SpellsReadyForCasting);
         }
     }
 
@@ -457,10 +465,7 @@ public class CombatSystem
     public void StartAttack(Spell spell)
     {
         var packet = combatManager.RequestPacket();
-        packet.Attacker = spell.Attacker;
-        packet.Targeting = spell.Targeting;
-        packet.SpellEffect = spell.SpellEffect;
-        packet.AttackType = AttackType.Melee;
+        packet.LoadSpell(spell);
 
         OnAttackStart?.Invoke(packet);
 
