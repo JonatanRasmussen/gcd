@@ -135,36 +135,14 @@ public class Spell
     public CombatObject? Attacker { get; set; } // Source
     public Targeting Targeting { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
-    public TimeTracker PreActivationTimer { get; set; }
-    public TimeTracker PostActivationTimer { get; set; }
-    public bool IsActive { get; set; }
+    public int ExecutionCycle { get; set; }
 
     public Spell()
     {
         Attacker = null;
         Targeting = new();
         SpellEffect = null;
-        PreActivationTimer = new();
-        PostActivationTimer = new();
-        IsActive = false;
-    }
-
-    public void UpdatePreActivationTimer(TimeSpan externalTimer)
-    {
-        PreActivationTimer.Update(externalTimer);
-        if (PreActivationTimer.ActivationTimeStampIsNow)
-        {
-            IsActive = true;
-        }
-    }
-
-    public void UpdatePostActivationTimer(TimeSpan externalTimer)
-    {
-        PreActivationTimer.Update(externalTimer);
-        if (PreActivationTimer.ActivationTimeStampIsNow)
-        {
-            IsActive = true;
-        }
+        ExecutionCycle = 0;
     }
 
     public List<CombatObject> GetTargets()
@@ -183,82 +161,65 @@ public class Spell
     }
 }
 
-public class SpellSchedule
+public class ScheduledSpell
 {
-    public List<Spell> ScheduledSpells { get; set; }
-    public List<Spell> SpellsReadyForCasting { get; set; }
+    public Spell Spell { get; set; }
+    public TimeTracker Timer { get; set; }
 
-    public SpellSchedule()
+    public ScheduledSpell()
     {
-        ScheduledSpells = new();
-        SpellsReadyForCasting = new();
+        Spell = new();
+        Timer = new();
     }
 
-    public void UpdateSpellsReadyForCasting(TimeSpan externalTimer)
+    public void UpdateTimer(TimeSpan externalTimer)
     {
-        SpellsReadyForCasting.Clear();
-        foreach (var spell in ScheduledSpells)
-        {
-            spell.UpdatePreActivationTimer(externalTimer);
-            if (spell.IsActive)
-            {
-                SpellsReadyForCasting.Add(spell);
-                spell.IsActive = false;
-            }
-        }
+        Timer.Update(externalTimer);
     }
+
+    public bool ActivationTimeStampIsReached()
+    {
+        return Timer.ActivationTimeStampIsNow;
+    }
+
 }
 
 public class SpellCasterObject
 {
     public CombatSystem CombatSystem { get; set; }
     public CombatObject Caster { get; set; }
+    public List<ScheduledSpell> ScheduledSpells { get; set; }
     public List<Spell> SpellQueue { get; set; }
-    public SpellSchedule? SpellSchedule { get; set; }
     public SpellCasterObject(CombatSystem combatSystem, CombatObject caster)
     {
         CombatSystem = combatSystem;
         Caster = caster;
+        ScheduledSpells = new();
         SpellQueue = new();
-        SpellSchedule = null;
     }
 
-    public void ExecuteSpellQueue(List<CombatObject> combatObjects, TimeSpan encounterTimer)
+    public void UpdateSpellQueue(TimeSpan externalTimer)
     {
-        RefreshSpellQueue(encounterTimer);
+        SpellQueue.Clear();
+        ListenForPlayerInput();
+        foreach (var scheduledSpell in ScheduledSpells)
+        {
+            scheduledSpell.UpdateTimer(externalTimer);
+            if (scheduledSpell.ActivationTimeStampIsReached())
+            {
+                SpellQueue.Add(scheduledSpell.Spell);
+            }
+        }
+    }
+
+    public void ExecuteSpellQueue(List<CombatObject> combatObjects)
+    {
         foreach (var spell in SpellQueue)
         {
             spell.SelectTargets(combatObjects);
             if (SpellCastIsValid(spell))
             {
                 CombatSystem.StartAttack(spell);
-            }
-        }
-        ClearFinishedSpellsFromQueue();
-    }
-
-    private void RefreshSpellQueue(TimeSpan encounterTimer)
-    {
-        if (SpellSchedule == null)
-        {
-            ListenForPlayerInput();
-        }
-        else
-        {
-            SpellSchedule.UpdateSpellsReadyForCasting(encounterTimer);
-            SpellQueue.AddRange(SpellSchedule.SpellsReadyForCasting);
-        }
-    }
-
-    private void ClearFinishedSpellsFromQueue()
-    {
-        // Iterate in reverse order to safely remove elements during iteration over the list
-        for (var i = SpellQueue.Count - 1; i >= 0; i--)
-        {
-            var spell = SpellQueue[i];
-            if (!spell.IsActive)
-            {
-                SpellQueue.RemoveAt(i);
             }
         }
     }
@@ -295,7 +256,8 @@ public class CombatEncounter
     {
         foreach (var spellCasterObject in SpellCasterObjects)
         {
-            spellCasterObject.ExecuteSpellQueue(CombatObjects, EncounterTimer);
+            spellCasterObject.UpdateSpellQueue(EncounterTimer);
+            spellCasterObject.ExecuteSpellQueue(CombatObjects);
         }
         EncounterTimer += UpdateInterval;
     }
@@ -352,13 +314,14 @@ public static class SpellTemplate
 public interface ISpellEffect
 {
     string SpellID();
+    List<TimeSpan> FollowUpTimeStamps();
     void Execute(CombatPacket packet);
 }
 
 public class Spell0000 : ISpellEffect
 {
     public string SpellID() => "Spell0000";
-
+    public List<TimeSpan> FollowUpTimeStamps() => new();
     public void Execute(CombatPacket packet)
     {
         // Empty
@@ -367,7 +330,8 @@ public class Spell0000 : ISpellEffect
 
 public class Spell0001 : ISpellEffect
 {
-    public string SpellID() => "Spell000";
+    public string SpellID() => "Spell0001";
+    public List<TimeSpan> FollowUpTimeStamps() => new();
     private readonly float damage = 10;
     public void Execute(CombatPacket packet)
     {
@@ -381,6 +345,7 @@ public class CombatPacket
     public Targeting? Targeting { get; set; }
     public List<CombatObject> Targets { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
+    public int ExecutionCycle { get; set; }
     public bool AttackIsSuccesful { get; set; } // Determines if the attack was successful
     public AttackType AttackType { get; set; }
     // Additional fields as needed
@@ -391,6 +356,7 @@ public class CombatPacket
         Targeting = null;
         Targets = new();
         SpellEffect = null;
+        ExecutionCycle = 0;
     }
 
     public void LoadSpell(Spell spell)
@@ -399,6 +365,7 @@ public class CombatPacket
         Targeting = spell.Targeting;
         Targets = spell.GetTargets();
         SpellEffect = spell.SpellEffect;
+        ExecutionCycle = spell.ExecutionCycle;
     }
 
     public void ResetPacket()
