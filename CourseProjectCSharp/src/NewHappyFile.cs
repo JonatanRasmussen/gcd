@@ -3,12 +3,19 @@ using System.Collections.Generic;
 
 namespace GlobalNameSpace;
 
-public enum AttackType
+public enum AttackFlags
 {
-    Melee,
-    Ranged,
-    Magic,
-    AreaOfEffect
+    Casting,
+    Channeling,
+    Damage,
+    Heal,
+    OverTime,
+    AoE,
+    Tankable,
+    Soakable,
+    DistanceFalloff,
+    Avoidable,
+    FriendlyFire,
 }
 
 public class AnimationSystem
@@ -27,19 +34,23 @@ public class AudioSystem
     }
 }
 
+/// <summary>
+/// Configurations for determining the targets of an attack
+/// </summary>
 public class Targeting
 {
+    public static readonly Targeting Empty = new();
     public List<CombatObject> Targets { get; set; }
-    public Position? TargetLocation { get; set; } // For area attacks
-    public ITargetStrategy? TargetStrategy { get; set; } // For area attacks
-    public string SelectionInput { get; set; } // For area attacks
+    public Position? TargetLocation { get; set; }
+    public ITargetStrategy? TargetStrategy { get; set; }
+    public string TargetStrategyInput { get; set; }
 
     public Targeting()
     {
         Targets = new();
         TargetLocation = null;
         TargetStrategy = null;
-        SelectionInput = string.Empty;
+        TargetStrategyInput = string.Empty;
     }
 
     public List<CombatObject> GetTargets()
@@ -54,12 +65,16 @@ public class Targeting
 
     public void SelectTargets(List<CombatObject> combatObjects)
     {
-        Targets = TargetStrategy?.Execute(SelectionInput, combatObjects) ?? new();
+        Targets = TargetStrategy?.Execute(TargetStrategyInput, combatObjects) ?? new();
     }
 }
 
+/// <summary>
+/// Positional data for a unit or an area-based attack
+/// </summary>
 public class Position
 {
+    public static readonly Position Empty = new(-9999, -9999);
     public float X { get; set; }
     public float Y { get; set; }
     public bool HasHitbox { get; set; }
@@ -72,33 +87,37 @@ public class Position
     }
 }
 
+/// <summary>
+/// Time-based trigger to initiate scheduled spell casts
+/// </summary>
 public class TimeTracker
 {
-    public bool ActivationTimeStampIsNow { get; set; }
-    public TimeSpan? ActivationTimeStamp { get; set; }
-    public TimeSpan? Timer { get; set; }
+    public static readonly TimeTracker Empty = new();
+    public TimeSpan? InternalTimer { get; set; }
     public TimeSpan Offset { get; set; }
+    public TimeSpan? ActivationTimeStamp { get; set; }
+    public bool ActivationTimeStampIsNow { get; set; }
 
     public TimeTracker()
     {
-        ActivationTimeStampIsNow = false; //Cannot happen on first Update, as Timer is null
-        ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
-        Timer = null;  //Starts at 0, regardless of external timer
+        InternalTimer = null;  //Starts at 0, regardless of external timer
         Offset = TimeSpan.Zero;
+        ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
+        ActivationTimeStampIsNow = false; //Cannot happen on first Update, as Timer is null
     }
 
     public void Update(TimeSpan externalTimer)
     {
-        if (Timer == null)  //Run this the first time the method is called
+        if (InternalTimer == null)  //Run this the first time the method is called
         {
             Offset = externalTimer;
             UpdateInternalTimer(externalTimer);
         }
         else if (ActivationTimeStamp != null) //Run this if an ActivationTimeStamp exists and is unreached
         {
-            TimeSpan timeStart = Timer ?? TimeSpan.Zero; //before updating the internal timer
+            TimeSpan timeStart = InternalTimer ?? TimeSpan.Zero; //before updating the internal timer
             UpdateInternalTimer(externalTimer);
-            TimeSpan timeEnd = Timer ?? TimeSpan.Zero; //after updating the internal timer
+            TimeSpan timeEnd = InternalTimer ?? TimeSpan.Zero; //after updating the internal timer
             ActivationTimeStampIsNow = ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd;
         }
         else  // Increment internal timer to keep up with updated external timer
@@ -107,20 +126,28 @@ public class TimeTracker
         }
     }
 
+    public void ScheduleNewActivationTime(TimeSpan nextActivation)
+    {
+        ActivationTimeStamp += nextActivation;
+    }
+
     private void UpdateInternalTimer(TimeSpan externalTimer)
     {
         // Increment internal timer to keep up with external timer
-        Timer = externalTimer - Offset;
+        InternalTimer = externalTimer - Offset;
     }
 }
 
+/// <summary>
+/// Algorithm or logic for selecting the targets of an attack
+/// </summary>
 public interface ITargetStrategy
 {
     string SpellID();
     List<CombatObject> Execute(string input, List<CombatObject> combatObjects);
 }
 
-public class TargetSelection0000 : ITargetStrategy
+public class TargetSelectionEmpty : ITargetStrategy
 {
     public string SpellID() => "T0000";
 
@@ -130,8 +157,12 @@ public class TargetSelection0000 : ITargetStrategy
     }
 }
 
+/// <summary>
+/// Configuration for an attack
+/// </summary>
 public class Spell
 {
+    public static readonly Spell Empty = new();
     public CombatObject? Attacker { get; set; } // Source
     public Targeting Targeting { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
@@ -159,17 +190,42 @@ public class Spell
     {
         Targeting.SelectTargets(combatObjects);
     }
+
+    public void IncrementExecutionCycle()
+    {
+        ExecutionCycle += 1;
+    }
 }
 
+/// <summary>
+/// Configuration for scheduling an upcoming attack via a timer
+/// </summary>
 public class ScheduledSpell
 {
+    public static readonly ScheduledSpell Empty = new();
     public Spell Spell { get; set; }
     public TimeTracker Timer { get; set; }
+    public int Casts { get; set; }
 
     public ScheduledSpell()
     {
         Spell = new();
         Timer = new();
+        Casts = 0;
+    }
+
+    public void ScheduleFollowUpSpellEffects()
+    {
+        if (Spell.SpellEffect != null)
+        {
+            List<TimeSpan> followUpEffects = Spell.SpellEffect.FollowUpTimeStamps();
+            if (Casts < followUpEffects.Count)
+            {
+                TimeSpan timeStamp = followUpEffects[Casts];
+                Timer.ScheduleNewActivationTime(timeStamp);
+                Casts += 1;
+            }
+        }
     }
 
     public void UpdateTimer(TimeSpan externalTimer)
@@ -184,6 +240,9 @@ public class ScheduledSpell
 
 }
 
+/// <summary>
+/// Handles whether or not an attack should be initiated
+/// </summary>
 public class SpellCasterObject
 {
     public CombatSystem CombatSystem { get; set; }
@@ -220,6 +279,7 @@ public class SpellCasterObject
             if (SpellCastIsValid(spell))
             {
                 CombatSystem.StartAttack(spell);
+                spell.IncrementExecutionCycle();
             }
         }
     }
@@ -235,8 +295,12 @@ public class SpellCasterObject
     }
 }
 
+/// <summary>
+/// Contains combat units and controls the flow of attacks
+/// </summary>
 public class CombatEncounter
 {
+    public static readonly CombatObject DebugUnit = new();
     public CombatSystem CombatSystem { get; set; }
     public List<CombatObject> CombatObjects { get; set; }
     public List<SpellCasterObject> SpellCasterObjects { get; set; }
@@ -263,8 +327,12 @@ public class CombatEncounter
     }
 }
 
+/// <summary>
+/// A unit that is part of combat and targetable by spells
+/// </summary>
 public class CombatObject
 {
+    public Position? Position { get; set; }
     public bool IsInCombat { get; set; }
     public bool HasHP { get; set; }
     public float MaxHP { get; set; }
@@ -299,6 +367,9 @@ public class CombatObject
     }
 }
 
+/// <summary>
+/// Utility functions for applying a spell effect to its targets
+/// </summary>
 public static class SpellTemplate
 {
     public static void DealDamage(List<CombatObject> targets, float damage)
@@ -310,7 +381,9 @@ public static class SpellTemplate
     }
 }
 
-
+/// <summary>
+/// Algorithm or logic specifying the behavior of a spell
+/// </summary>
 public interface ISpellEffect
 {
     string SpellID();
@@ -339,16 +412,18 @@ public class Spell0001 : ISpellEffect
     }
 }
 
+/// <summary>
+/// Configurations for an ongoing attack
+/// </summary>
 public class CombatPacket
 {
-    public CombatObject? Attacker { get; set; } // Source
+    public CombatObject? Attacker { get; set; }
     public Targeting? Targeting { get; set; }
     public List<CombatObject> Targets { get; set; }
     public ISpellEffect? SpellEffect { get; set; }
     public int ExecutionCycle { get; set; }
-    public bool AttackIsSuccesful { get; set; } // Determines if the attack was successful
-    public AttackType AttackType { get; set; }
-    // Additional fields as needed
+    public bool AttackIsSuccesful { get; set; }
+    public AttackFlags AttackType { get; set; }
 
     public CombatPacket()
     {
@@ -376,6 +451,9 @@ public class CombatPacket
     }
 }
 
+/// <summary>
+/// Manages and stores ongoing attack packets
+/// </summary>
 public class CombatManager
 {
     private readonly Queue<CombatPacket> packetPool;
@@ -411,15 +489,12 @@ public class CombatManager
     }
 }
 
+/// <summary>
+/// Processes incoming attack packet / combat packets
+/// </summary>
 public class CombatSystem
 {
     public event Action<CombatPacket>? OnAttackStart;
-    public event Action<CombatPacket>? OnAttackAnimationStart;
-    public event Action<CombatPacket>? OnProjectileLaunch;
-    public event Action<CombatPacket>? OnAttackProgress;
-    public event Action<CombatPacket>? OnAttackHit;
-    public event Action<CombatPacket>? OnAttackMiss;
-    public event Action<CombatPacket>? OnAttackEnd;
     public event Action<CombatPacket>? OnAttackComplete;
 
     private readonly CombatManager combatManager;
@@ -433,51 +508,14 @@ public class CombatSystem
     {
         var packet = combatManager.RequestPacket();
         packet.LoadSpell(spell);
-
-        OnAttackStart?.Invoke(packet);
-
-        // Fill in other details and handle the attack logic
-
         HandleAttack(packet);
-
-        OnAttackComplete?.Invoke(packet);
-        combatManager.ReleasePacket(packet); // Release the packet when done
+        combatManager.ReleasePacket(packet);
     }
 
     private void HandleAttack(CombatPacket packet)
     {
+        OnAttackStart?.Invoke(packet);
         packet.SpellEffect?.Execute(packet);
-        OnAttackAnimationStart?.Invoke(packet);
-        // Handle animation logic
-
-        if (packet.AttackType == AttackType.Ranged)
-        {
-            OnProjectileLaunch?.Invoke(packet);
-            // Handle projectile launch logic
-        }
-
-        OnAttackProgress?.Invoke(packet);
-        // Handle ongoing attack logic
-
-        var hitSuccessful = DetermineHit(packet);
-        if (hitSuccessful)
-        {
-            OnAttackHit?.Invoke(packet);
-            // Handle hit logic
-        }
-        else
-        {
-            OnAttackMiss?.Invoke(packet);
-            // Handle miss logic
-        }
-
-        OnAttackEnd?.Invoke(packet);
-        // Handle attack end logic
-    }
-
-    private bool DetermineHit(CombatPacket packet)
-    {
-        // Implement hit determination logic
-        return true; // PlaceholderTest
+        OnAttackComplete?.Invoke(packet);
     }
 }
