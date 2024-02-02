@@ -5608,11 +5608,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
+      "projectUniqueName": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
       "projectName": "CourseProjectTests",
-      "projectPath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
+      "projectPath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\CourseProjectTests.csproj",
       "packagesPath": "C:\\Users\\BudoB\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\obj\\",
+      "outputPath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectTests\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\BudoB\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -5627,8 +5627,8 @@
         "net7.0": {
           "targetAlias": "net7.0",
           "projectReferences": {
-            "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {
-              "projectPath": "c:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj"
+            "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj": {
+              "projectPath": "C:\\Users\\BudoB\\OneDrive\\Dokumenter Tekst\\Programmering\\gcd\\CourseProjectCSharp\\CourseProjectCSharp.csproj"
             }
           }
         }
