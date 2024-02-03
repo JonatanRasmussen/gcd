@@ -41,26 +41,16 @@ public class Targeting
 {
     public static readonly Targeting Empty = new();
     public List<CombatObject> Targets { get; set; }
-    public Position? TargetLocation { get; set; }
-    public ITargetStrategy? TargetStrategy { get; set; }
+    public List<Position> TargetLocation { get; set; }
+    public ITargetStrategy TargetStrategy { get; set; }
     public string TargetStrategyInput { get; set; }
 
     public Targeting()
     {
         Targets = new();
-        TargetLocation = null;
-        TargetStrategy = null;
+        TargetLocation = new();
+        TargetStrategy = new EmptyTargetStrategy();
         TargetStrategyInput = string.Empty;
-    }
-
-    public List<CombatObject> GetTargets()
-    {
-        return Targets;
-    }
-
-    public void SetTargets(List<CombatObject> combatObjects)
-    {
-        Targets = combatObjects;
     }
 
     public void SelectTargets(List<CombatObject> combatObjects)
@@ -74,16 +64,26 @@ public class Targeting
 /// </summary>
 public class Position
 {
-    public static readonly Position Empty = new(-9999, -9999);
+    public static readonly Position Empty = new();
     public float X { get; set; }
     public float Y { get; set; }
-    public bool HasHitbox { get; set; }
+    public int Realm { get; set; } // Units can't see/interact cross-realm
+    public bool AffectedByAoE { get; set; }
+    private static readonly int defaultX = 9999;
+    private static readonly int defaultY = 9999;
 
-    public Position(float x, float y)
+    public Position()
+    {
+        X = defaultX;
+        Y = defaultY;
+        Realm = 0;
+        AffectedByAoE = true;
+    }
+
+    public void Update(float x, float y)
     {
         X = x;
         Y = y;
-        HasHitbox = true;
     }
 }
 
@@ -97,13 +97,14 @@ public class TimeTracker
     public TimeSpan Offset { get; set; }
     public TimeSpan? ActivationTimeStamp { get; set; }
     public bool ActivationTimeStampIsNow { get; set; }
+    private TimeSpan? timeStart = null;
+    private TimeSpan timeEnd = TimeSpan.Zero;
 
     public TimeTracker()
     {
         InternalTimer = null;  //Starts at 0, regardless of external timer
         Offset = TimeSpan.Zero;
         ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
-        ActivationTimeStampIsNow = false; //Cannot happen on first Update, as Timer is null
     }
 
     public void Update(TimeSpan externalTimer)
@@ -115,10 +116,9 @@ public class TimeTracker
         }
         else if (ActivationTimeStamp != null) //Run this if an ActivationTimeStamp exists and is unreached
         {
-            TimeSpan timeStart = InternalTimer ?? TimeSpan.Zero; //before updating the internal timer
+            timeStart = InternalTimer ?? TimeSpan.Zero; //before updating the internal timer
             UpdateInternalTimer(externalTimer);
-            TimeSpan timeEnd = InternalTimer ?? TimeSpan.Zero; //after updating the internal timer
-            ActivationTimeStampIsNow = ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd;
+            timeEnd = InternalTimer ?? TimeSpan.Zero; //after updating the internal timer
         }
         else  // Increment internal timer to keep up with updated external timer
         {
@@ -129,6 +129,21 @@ public class TimeTracker
     public void ScheduleNewActivationTime(TimeSpan nextActivation)
     {
         ActivationTimeStamp += nextActivation;
+    }
+
+    public void RemoveActivationTime()
+    {
+        ActivationTimeStamp = null;
+        timeStart = null;
+    }
+
+    public bool IsActivationTimeStampReached()
+    {
+        if (ActivationTimeStamp != null && timeStart != null)
+        {
+            return (ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd);
+        }
+        return false;
     }
 
     private void UpdateInternalTimer(TimeSpan externalTimer)
@@ -147,7 +162,7 @@ public interface ITargetStrategy
     List<CombatObject> Execute(string input, List<CombatObject> combatObjects);
 }
 
-public class TargetSelectionEmpty : ITargetStrategy
+public class EmptyTargetStrategy : ITargetStrategy
 {
     public string SpellID() => "T0000";
 
@@ -163,32 +178,17 @@ public class TargetSelectionEmpty : ITargetStrategy
 public class Spell
 {
     public static readonly Spell Empty = new();
-    public CombatObject? Attacker { get; set; } // Source
+    public CombatObject Attacker { get; set; } // Source
     public Targeting Targeting { get; set; }
-    public ISpellEffect? SpellEffect { get; set; }
+    public ISpellEffect SpellEffect { get; set; }
     public int ExecutionCycle { get; set; }
 
     public Spell()
     {
-        Attacker = null;
+        Attacker = CombatObject.Empty;
         Targeting = new();
-        SpellEffect = null;
+        SpellEffect = new EmptySpellEffect();
         ExecutionCycle = 0;
-    }
-
-    public List<CombatObject> GetTargets()
-    {
-        return Targeting.GetTargets();
-    }
-
-    public void SetTargets(List<CombatObject> combatObjects)
-    {
-        Targeting.SetTargets(combatObjects);
-    }
-
-    public void SelectTargets(List<CombatObject> combatObjects)
-    {
-        Targeting.SelectTargets(combatObjects);
     }
 
     public void IncrementExecutionCycle()
@@ -216,28 +216,30 @@ public class ScheduledSpell
 
     public void ScheduleFollowUpSpellEffects()
     {
-        if (Spell.SpellEffect != null)
+        List<TimeSpan> followUpEffects = Spell.SpellEffect.FollowUpTimeStamps();
+        if (Casts < followUpEffects.Count)
         {
-            List<TimeSpan> followUpEffects = Spell.SpellEffect.FollowUpTimeStamps();
-            if (Casts < followUpEffects.Count)
-            {
-                TimeSpan timeStamp = followUpEffects[Casts];
-                Timer.ScheduleNewActivationTime(timeStamp);
-                Casts += 1;
-            }
+            TimeSpan timeStamp = followUpEffects[Casts];
+            Timer.ScheduleNewActivationTime(timeStamp);
+            Casts += 1;
+        }
+        else
+        {
+            Timer.RemoveActivationTime();
         }
     }
+}
 
-    public void UpdateTimer(TimeSpan externalTimer)
+public class SpellScheduleGenerator
+{
+    public static readonly string Empty = string.Empty;
+    public int NeinNein { get; set; }
+    private readonly int nein = 9;
+
+    public SpellScheduleGenerator()
     {
-        Timer.Update(externalTimer);
+        NeinNein = 99;
     }
-
-    public bool ActivationTimeStampIsReached()
-    {
-        return Timer.ActivationTimeStampIsNow;
-    }
-
 }
 
 /// <summary>
@@ -245,42 +247,52 @@ public class ScheduledSpell
 /// </summary>
 public class SpellCasterObject
 {
-    public CombatSystem CombatSystem { get; set; }
+    public static readonly SpellCasterObject Empty = new();
     public CombatObject Caster { get; set; }
     public List<ScheduledSpell> ScheduledSpells { get; set; }
     public List<Spell> SpellQueue { get; set; }
-    public SpellCasterObject(CombatSystem combatSystem, CombatObject caster)
+    public SpellCasterObject()
     {
-        CombatSystem = combatSystem;
-        Caster = caster;
+        Caster = CombatObject.Empty;
         ScheduledSpells = new();
         SpellQueue = new();
     }
 
-    public void UpdateSpellQueue(TimeSpan externalTimer)
+    public void GenerateSpellQueue(TimeSpan externalTimer)
     {
         SpellQueue.Clear();
         ListenForPlayerInput();
         foreach (var scheduledSpell in ScheduledSpells)
         {
-            scheduledSpell.UpdateTimer(externalTimer);
-            if (scheduledSpell.ActivationTimeStampIsReached())
+            scheduledSpell.Timer.Update(externalTimer);;
+            while (scheduledSpell.Timer.IsActivationTimeStampReached())
             {
                 SpellQueue.Add(scheduledSpell.Spell);
+                scheduledSpell.ScheduleFollowUpSpellEffects();
             }
         }
     }
 
-    public void ExecuteSpellQueue(List<CombatObject> combatObjects)
+    public void ValidateSpellQueue(List<CombatObject> combatObjects)
+    {
+        // Iterate backwards to safely remove elements
+        for (int i = SpellQueue.Count - 1; i >= 0; i--)
+        {
+            var spell = SpellQueue[i];
+            spell.Targeting.SelectTargets(combatObjects);
+            if (!SpellCastIsValid(spell))
+            {
+                SpellQueue.RemoveAt(i);
+            }
+        }
+    }
+
+    public void ExecuteSpellQueue(CombatSystem combatSystem)
     {
         foreach (var spell in SpellQueue)
         {
-            spell.SelectTargets(combatObjects);
-            if (SpellCastIsValid(spell))
-            {
-                CombatSystem.StartAttack(spell);
-                spell.IncrementExecutionCycle();
-            }
+            combatSystem.StartAttack(spell);
+            spell.IncrementExecutionCycle();
         }
     }
 
@@ -300,38 +312,55 @@ public class SpellCasterObject
 /// </summary>
 public class CombatEncounter
 {
-    public static readonly CombatObject DebugUnit = new();
+    public static readonly CombatEncounter Empty = new();
     public CombatSystem CombatSystem { get; set; }
     public List<CombatObject> CombatObjects { get; set; }
     public List<SpellCasterObject> SpellCasterObjects { get; set; }
     public TimeSpan EncounterTimer { get; set; }
-    public TimeSpan UpdateInterval { get; set; }
+    public int UpdatesPerSecond { get; private set; }
+    public bool CombatInProgress { get; set; }
+    private readonly int defaultUpdateRate = 30;
+    private TimeSpan updateInterval;
 
-    public CombatEncounter(int updatesPerSecond)
+    public CombatEncounter()
     {
         CombatSystem = new();
         CombatObjects = new();
         SpellCasterObjects = new();
         EncounterTimer = TimeSpan.Zero;
-        UpdateInterval = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / updatesPerSecond);
+        SetUpdatesPerSecond(defaultUpdateRate);
     }
 
     public void ProcessCombat()
     {
         foreach (var spellCasterObject in SpellCasterObjects)
         {
-            spellCasterObject.UpdateSpellQueue(EncounterTimer);
-            spellCasterObject.ExecuteSpellQueue(CombatObjects);
+            spellCasterObject.GenerateSpellQueue(EncounterTimer);
+            spellCasterObject.ValidateSpellQueue(CombatObjects);
+            spellCasterObject.ExecuteSpellQueue(CombatSystem);
         }
-        EncounterTimer += UpdateInterval;
+        EncounterTimer += updateInterval;
+    }
+
+    public void SetUpdatesPerSecond(int updatesPerSecond)
+    {
+        UpdatesPerSecond = updatesPerSecond;
+        updateInterval = CalculateUpdateInterval();
+    }
+
+    private TimeSpan CalculateUpdateInterval()
+    {
+        return TimeSpan.FromTicks(TimeSpan.TicksPerSecond / UpdatesPerSecond);
     }
 }
+
 
 /// <summary>
 /// A unit that is part of combat and targetable by spells
 /// </summary>
 public class CombatObject
 {
+    public static readonly CombatObject Empty = new();
     public Position? Position { get; set; }
     public bool IsInCombat { get; set; }
     public bool HasHP { get; set; }
@@ -391,7 +420,7 @@ public interface ISpellEffect
     void Execute(CombatPacket packet);
 }
 
-public class Spell0000 : ISpellEffect
+public class EmptySpellEffect : ISpellEffect
 {
     public string SpellID() => "Spell0000";
     public List<TimeSpan> FollowUpTimeStamps() => new();
@@ -404,6 +433,16 @@ public class Spell0000 : ISpellEffect
 public class Spell0001 : ISpellEffect
 {
     public string SpellID() => "Spell0001";
+    public List<TimeSpan> FollowUpTimeStamps() => new();
+    public void Execute(CombatPacket packet)
+    {
+        // Empty
+    }
+}
+
+public class Spell0002 : ISpellEffect
+{
+    public string SpellID() => "Spell0002";
     public List<TimeSpan> FollowUpTimeStamps() => new();
     private readonly float damage = 10;
     public void Execute(CombatPacket packet)
@@ -438,7 +477,7 @@ public class CombatPacket
     {
         Attacker = spell.Attacker;
         Targeting = spell.Targeting;
-        Targets = spell.GetTargets();
+        Targets = spell.Targeting.Targets;
         SpellEffect = spell.SpellEffect;
         ExecutionCycle = spell.ExecutionCycle;
     }
