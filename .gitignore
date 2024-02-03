@@ -53,5 +53,7 @@ $RECYCLE.BIN/
 *.sln.iml
 
 # Bin and obj folders
-bin/
-obj/
+CourseProjectCSharp/bin/
+CourseProjectCSharp/obj/
+CourseProjectTests/bin/
+CourseProjectTests/obj/
