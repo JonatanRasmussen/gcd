@@ -57,3 +57,5 @@ CourseProjectCSharp/bin/
 CourseProjectCSharp/obj/
 CourseProjectTests/bin/
 CourseProjectTests/obj/
+bin/
+obj/
