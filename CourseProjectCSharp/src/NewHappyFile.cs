@@ -95,7 +95,7 @@ public class TimeTracker
     public static readonly TimeTracker Empty = new();
     public TimeSpan? InternalTimer { get; set; }
     public TimeSpan Offset { get; set; }
-    public TimeSpan? ActivationTimeStamp { get; set; }
+    public TimeSpan? ActivationTimeStamp { get; private set; }
     public bool ActivationTimeStampIsNow { get; set; }
     private TimeSpan? timeStart = null;
     private TimeSpan timeEnd = TimeSpan.Zero;
@@ -105,6 +105,13 @@ public class TimeTracker
         InternalTimer = null;  //Starts at 0, regardless of external timer
         Offset = TimeSpan.Zero;
         ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
+    }
+
+    public static TimeTracker CreateFromTimeStamp(int minutes, int seconds, int milliseconds)
+    {
+        TimeTracker timeTracker = new();
+        timeTracker.SetActivation(minutes, seconds, milliseconds);
+        return timeTracker;
     }
 
     public void Update(TimeSpan externalTimer)
@@ -144,6 +151,12 @@ public class TimeTracker
             return (ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd);
         }
         return false;
+    }
+
+    private void SetActivation(int minutes, int seconds, int milliseconds)
+    {
+        int totalMilliseconds = milliseconds + 1000 * (seconds + 60 * minutes);
+        ActivationTimeStamp = TimeSpan.FromMilliseconds(totalMilliseconds);
     }
 
     private void UpdateInternalTimer(TimeSpan externalTimer)
@@ -191,6 +204,16 @@ public class Spell
         ExecutionCycle = 0;
     }
 
+    public static Spell CreateFromSpellEffect(CombatObject attacker, ISpellEffect spellEffect)
+    {
+        return new()
+        {
+            Attacker = attacker,
+            Targeting = spellEffect.DefaultTargeting(),
+            SpellEffect = spellEffect,
+        };
+    }
+
     public void IncrementExecutionCycle()
     {
         ExecutionCycle += 1;
@@ -233,12 +256,27 @@ public class ScheduledSpell
 public class SpellScheduleGenerator
 {
     public static readonly string Empty = string.Empty;
+    public CombatObject Attacker { get; set; }
+    public List<ScheduledSpell> ScheduledSpells { get; set; }
     public int NeinNein { get; set; }
     private readonly int nein = 9;
 
     public SpellScheduleGenerator()
     {
+        Attacker = CombatObject.Empty;
+        ScheduledSpells = new();
         NeinNein = 99;
+    }
+
+    public void Schedule(ISpellEffect spellEffect, int minute, int second, int millisecond)
+    {
+        ScheduledSpells.Add(
+            new()
+            {
+                Spell = Spell.CreateFromSpellEffect(Attacker, spellEffect),
+                Timer = TimeTracker.CreateFromTimeStamp(minute, second, millisecond),
+            }
+        );
     }
 }
 
@@ -248,12 +286,12 @@ public class SpellScheduleGenerator
 public class SpellCasterObject
 {
     public static readonly SpellCasterObject Empty = new();
-    public CombatObject Caster { get; set; }
+    public CombatObject Attacker { get; set; }
     public List<ScheduledSpell> ScheduledSpells { get; set; }
     public List<Spell> SpellQueue { get; set; }
     public SpellCasterObject()
     {
-        Caster = CombatObject.Empty;
+        Attacker = CombatObject.Empty;
         ScheduledSpells = new();
         SpellQueue = new();
     }
@@ -417,6 +455,7 @@ public interface ISpellEffect
 {
     string SpellID();
     List<TimeSpan> FollowUpTimeStamps();
+    Targeting DefaultTargeting();
     void Execute(CombatPacket packet);
 }
 
@@ -424,6 +463,10 @@ public class EmptySpellEffect : ISpellEffect
 {
     public string SpellID() => "Spell0000";
     public List<TimeSpan> FollowUpTimeStamps() => new();
+    public Targeting DefaultTargeting()
+    {
+        return Targeting.Empty;
+    }
     public void Execute(CombatPacket packet)
     {
         // Empty
@@ -434,6 +477,10 @@ public class Spell0001 : ISpellEffect
 {
     public string SpellID() => "Spell0001";
     public List<TimeSpan> FollowUpTimeStamps() => new();
+    public Targeting DefaultTargeting()
+    {
+        return Targeting.Empty;
+    }
     public void Execute(CombatPacket packet)
     {
         // Empty
@@ -445,6 +492,10 @@ public class Spell0002 : ISpellEffect
     public string SpellID() => "Spell0002";
     public List<TimeSpan> FollowUpTimeStamps() => new();
     private readonly float damage = 10;
+    public Targeting DefaultTargeting()
+    {
+        return Targeting.Empty;
+    }
     public void Execute(CombatPacket packet)
     {
         SpellTemplate.DealDamage(packet.Targets, damage);
