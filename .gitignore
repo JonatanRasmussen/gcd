@@ -53,9 +53,12 @@ $RECYCLE.BIN/
 *.sln.iml
 
 # Bin and obj folders
+gitignoretestfile.txt
 CourseProjectCSharp/bin/
 CourseProjectCSharp/obj/
 CourseProjectTests/bin/
 CourseProjectTests/obj/
 bin/
 obj/
+
+# Misc
