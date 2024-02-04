@@ -255,17 +255,13 @@ public class ScheduledSpell
 
 public class SpellScheduleGenerator
 {
-    public static readonly string Empty = string.Empty;
     public CombatObject Attacker { get; set; }
     public List<ScheduledSpell> ScheduledSpells { get; set; }
-    public int NeinNein { get; set; }
-    private readonly int nein = 9;
 
     public SpellScheduleGenerator()
     {
         Attacker = CombatObject.Empty;
         ScheduledSpells = new();
-        NeinNein = 99;
     }
 
     public void Schedule(ISpellEffect spellEffect, int minute, int second, int millisecond)
@@ -280,23 +276,50 @@ public class SpellScheduleGenerator
     }
 }
 
+public interface ISpellSchedule
+{
+    List<Tuple<int, int, int, ISpellEffect>> Load();
+}
+
+public class EmptySpellSchedule : ISpellSchedule
+{
+    public List<Tuple<int, int, int, ISpellEffect>> Load()
+    {
+        return new();
+    }
+}
+
+public class SpellSchedule0001 : ISpellSchedule
+{
+    public List<Tuple<int, int, int, ISpellEffect>> Load()
+    {
+        return new List<Tuple<int, int, int, ISpellEffect>>
+        {
+            new (0, 0, 0, new EmptySpellEffect()),
+            new (0, 2, 500, new EmptySpellEffect()),
+        };
+    }
+}
+
 /// <summary>
 /// Handles whether or not an attack should be initiated
 /// </summary>
 public class SpellCasterObject
 {
     public static readonly SpellCasterObject Empty = new();
-    public CombatObject Attacker { get; set; }
+    public CombatObject Caster { get; set; }
+    public ISpellSchedule SpellSchedule { get; set; }
     public List<ScheduledSpell> ScheduledSpells { get; set; }
     public List<Spell> SpellQueue { get; set; }
     public SpellCasterObject()
     {
-        Attacker = CombatObject.Empty;
+        Caster = CombatObject.Empty;
+        SpellSchedule = new EmptySpellSchedule();
         ScheduledSpells = new();
         SpellQueue = new();
     }
 
-    public void GenerateSpellQueue(TimeSpan externalTimer)
+    public void PopulateSpellQueue(TimeSpan externalTimer)
     {
         SpellQueue.Clear();
         ListenForPlayerInput();
@@ -334,6 +357,30 @@ public class SpellCasterObject
         }
     }
 
+    public void LoadScheduledSpells()
+    {
+        var schedule = SpellSchedule.Load();
+        foreach (var config in schedule)
+        {
+            int minute = config.Item1;
+            int second = config.Item2;
+            int millisecond = config.Item3;
+            ISpellEffect spellEffect = config.Item4;
+            Schedule(minute, second, millisecond, spellEffect);
+        }
+    }
+
+    public void Schedule(int minute, int second, int millisecond, ISpellEffect spellEffect)
+    {
+        ScheduledSpells.Add(
+            new()
+            {
+                Spell = Spell.CreateFromSpellEffect(Caster, spellEffect),
+                Timer = TimeTracker.CreateFromTimeStamp(minute, second, millisecond),
+            }
+        );
+    }
+
     private static bool SpellCastIsValid(Spell spell)
     {
         return true;
@@ -357,7 +404,7 @@ public class CombatEncounter
     public TimeSpan EncounterTimer { get; set; }
     public int UpdatesPerSecond { get; private set; }
     public bool CombatInProgress { get; set; }
-    private readonly int defaultUpdateRate = 30;
+    private readonly int defaultUpdatesPerSecond = 100;
     private TimeSpan updateInterval;
 
     public CombatEncounter()
@@ -366,18 +413,50 @@ public class CombatEncounter
         CombatObjects = new();
         SpellCasterObjects = new();
         EncounterTimer = TimeSpan.Zero;
-        SetUpdatesPerSecond(defaultUpdateRate);
+        SetUpdatesPerSecond(defaultUpdatesPerSecond);
     }
 
     public void ProcessCombat()
     {
         foreach (var spellCasterObject in SpellCasterObjects)
         {
-            spellCasterObject.GenerateSpellQueue(EncounterTimer);
+            spellCasterObject.PopulateSpellQueue(EncounterTimer);
             spellCasterObject.ValidateSpellQueue(CombatObjects);
             spellCasterObject.ExecuteSpellQueue(CombatSystem);
         }
         EncounterTimer += updateInterval;
+    }
+
+    public void AddPlayer(ISpellSchedule spellSchedule)
+    {
+        CombatObject combatObject = new()
+        {
+            IsHostile = true,
+            MaxHP = CombatObject.DefaultPlayerHP,
+        };
+        SpellCasterObject spellCasterObject = new()
+        {
+            Caster = combatObject,
+            SpellSchedule = spellSchedule,
+        };
+        CombatObjects.Add(combatObject);
+        SpellCasterObjects.Add(spellCasterObject);
+    }
+
+    public void AddEnemy(INpc npc)
+    {
+        CombatObject combatObject = new()
+        {
+            IsHostile = true,
+            MaxHP = npc.BaseHP(),
+        };
+        SpellCasterObject spellCasterObject = new()
+        {
+            Caster = combatObject,
+            SpellSchedule = npc.SpellSchedule(),
+        };
+        CombatObjects.Add(combatObject);
+        SpellCasterObjects.Add(spellCasterObject);
     }
 
     public void SetUpdatesPerSecond(int updatesPerSecond)
@@ -392,14 +471,15 @@ public class CombatEncounter
     }
 }
 
-
 /// <summary>
 /// A unit that is part of combat and targetable by spells
 /// </summary>
 public class CombatObject
 {
     public static readonly CombatObject Empty = new();
+    public static readonly float DefaultPlayerHP = 1000;
     public Position? Position { get; set; }
+    public bool IsHostile { get; set; }
     public bool IsInCombat { get; set; }
     public bool HasHP { get; set; }
     public float MaxHP { get; set; }
@@ -407,6 +487,8 @@ public class CombatObject
     public CombatObject? Parent { get; set; }
     public CombatObject()
     {
+        IsHostile = false;
+        IsInCombat = true;
         HasHP = false;
         MaxHP = 1;
         CurrentHP = MaxHP;
@@ -446,6 +528,27 @@ public static class SpellTemplate
             target.ReduceCurrentHP(damage);
         }
     }
+}
+
+public interface INpc
+{
+    string NpcID();
+    float BaseHP();
+    ISpellSchedule SpellSchedule();
+}
+
+public class EmptyNpc : INpc
+{
+    public string NpcID() => "Npc0000";
+    public float BaseHP() => 9999;
+    public ISpellSchedule SpellSchedule() => new EmptySpellSchedule();
+}
+
+public class Npc0001 : INpc
+{
+    public string NpcID() => "Npc0001";
+    public float BaseHP() => 20;
+    public ISpellSchedule SpellSchedule() => new SpellSchedule0001();
 }
 
 /// <summary>
