@@ -40,6 +40,7 @@ public class AudioSystem
 public class Targeting
 {
     public static readonly Targeting Empty = new();
+    public CombatObject Attacker { get; set; }
     public List<CombatObject> Targets { get; set; }
     public List<Position> TargetLocation { get; set; }
     public ITargetStrategy TargetStrategy { get; set; }
@@ -47,6 +48,7 @@ public class Targeting
 
     public Targeting()
     {
+        Attacker = new();
         Targets = new();
         TargetLocation = new();
         TargetStrategy = new EmptyTargetStrategy();
@@ -199,7 +201,10 @@ public class Spell
     public Spell()
     {
         Attacker = CombatObject.Empty;
-        Targeting = new();
+        Targeting = new()
+        {
+            Attacker = Attacker
+        };
         SpellEffect = new EmptySpellEffect();
         ExecutionCycle = 0;
     }
@@ -527,6 +532,22 @@ public static class SpellTemplate
         {
             target.ReduceCurrentHP(damage);
         }
+    }
+}
+
+public static class TargetingTemplate
+{
+    public static List<CombatObject> TargetAllEnemies(List<CombatObject> targets, CombatObject attacker)
+    {
+        List<CombatObject> enemies = new();
+        foreach (var target in targets)
+        {
+            if (target.IsHostile != attacker.IsHostile)
+            {
+                enemies.Add(target);
+            }
+        }
+        return enemies;
     }
 }
 
