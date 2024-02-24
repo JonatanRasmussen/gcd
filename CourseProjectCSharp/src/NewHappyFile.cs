@@ -584,13 +584,13 @@ public class Spell0002 : ISpellEffect
 /// </summary>
 public class CombatPacket
 {
-    public CombatObject Source { get; set; }
-    public Targeting Destination { get; set; }
-    public List<CombatObject> Targets { get; set; }
-    public ISpellEffect SpellEffect { get; set; }
-    public int ExecutionCycle { get; set; }
-    public bool AttackIsSuccesful { get; set; }
-    public AttackFlags AttackType { get; set; }
+    public CombatObject Source { get; private set; }
+    public Targeting Destination { get; private set; }
+    public List<CombatObject> Targets { get; private set; }
+    public ISpellEffect SpellEffect { get; private set; }
+    public int ExecutionCycle { get; private set; }
+    public bool AttackIsSuccesful { get; private set; }
+    public AttackFlags AttackType { get; private set; }
 
     public CombatPacket()
     {
