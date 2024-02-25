@@ -190,12 +190,12 @@ public class CombatObject
         {
             Parent = this,
         };
-        child.LoadCombatScript(childTemplate);
+        child.ScheduleSpell(childTemplate.Spell());
     }
 
-    public void LoadCombatScript(INpc npcTemplate)
+    public void ScheduleSpell(Spell spell)
     {
-        Spell spell = npcTemplate.Spell();
+        spell.OffsetActivationTimeStamp(TimeSpentInEncounter);
         ScheduledSpells.Add(spell);
     }
 
@@ -231,7 +231,7 @@ public class Spell
     public CombatObject Source { get; }
     public Targeting Destination { get; }
     public ISpellEffect SpellEffect { get; }
-    public TimeSpan ActivationTimeStamp { get; }
+    public TimeSpan ActivationTimeStamp { get; private set; }
     public bool HasBeenCast { get; private set; }
 
     public Spell(CombatObject source, ISpellEffect spellEffect, TimeSpan timeStamp)
@@ -250,6 +250,11 @@ public class Spell
             HasBeenCast = true;
             combatSystem.CastSpell(this);
         }
+    }
+
+    public void OffsetActivationTimeStamp(TimeSpan offset)
+    {
+        ActivationTimeStamp += offset;
     }
 }
 
