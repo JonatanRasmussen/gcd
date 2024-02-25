@@ -85,279 +85,6 @@ public class Position
 }
 
 /// <summary>
-/// Time-based trigger to initiate scheduled spell casts
-/// </summary>
-public class TimeTracker
-{
-    public static readonly TimeTracker Empty = new();
-    public TimeSpan? InternalTimer { get; private set; }
-    public TimeSpan Offset { get; private set; }
-    public TimeSpan? ActivationTimeStamp { get; private set; }
-    public bool ActivationTimeStampIsNow { get; private set; }
-    private TimeSpan? timeStart = null;
-    private TimeSpan timeEnd = TimeSpan.Zero;
-
-    public TimeTracker()
-    {
-        InternalTimer = null;  //Starts at 0, regardless of external timer
-        Offset = TimeSpan.Zero;
-        ActivationTimeStamp = null; //TimeStamp 00:00 is triggered on SECOND update, not first
-    }
-
-    public static TimeTracker CreateFromTimeStamp(int minutes, int seconds, int milliseconds)
-    {
-        TimeTracker timeTracker = new();
-        timeTracker.SetActivation(minutes, seconds, milliseconds);
-        return timeTracker;
-    }
-
-    public void Update(TimeSpan externalTimer)
-    {
-        if (InternalTimer == null)  //Run this the first time the method is called
-        {
-            Offset = externalTimer;
-            UpdateInternalTimer(externalTimer);
-        }
-        else if (ActivationTimeStamp != null) //Run this if an ActivationTimeStamp exists and is unreached
-        {
-            timeStart = InternalTimer ?? TimeSpan.Zero; //before updating the internal timer
-            UpdateInternalTimer(externalTimer);
-            timeEnd = InternalTimer ?? TimeSpan.Zero; //after updating the internal timer
-        }
-        else  // Increment internal timer to keep up with updated external timer
-        {
-            UpdateInternalTimer(externalTimer);
-        }
-    }
-
-    public void ScheduleNewActivationTime(TimeSpan nextActivation)
-    {
-        ActivationTimeStamp = InternalTimer + nextActivation;
-    }
-
-    public void RemoveActivationTime()
-    {
-        ActivationTimeStamp = null;
-        timeStart = null;
-    }
-
-    public bool IsActivationTimeStampReached()
-    {
-        if (ActivationTimeStamp != null && timeStart != null)
-        {
-            return (ActivationTimeStamp >= timeStart && ActivationTimeStamp < timeEnd);
-        }
-        return false;
-    }
-
-    private void SetActivation(int minutes, int seconds, int milliseconds)
-    {
-        int totalMilliseconds = milliseconds + 1000 * (seconds + 60 * minutes);
-        ActivationTimeStamp = TimeSpan.FromMilliseconds(totalMilliseconds);
-    }
-
-    private void UpdateInternalTimer(TimeSpan externalTimer)
-    {
-        // Increment internal timer to keep up with external timer
-        InternalTimer = externalTimer - Offset;
-    }
-}
-
-/// <summary>
-/// Configuration for an attack
-/// </summary>
-public class Spell
-{
-    public static readonly Spell Empty = new(CombatObject.Empty, EmptySpellEffect.Empty);
-    public CombatObject Source { get; }
-    public Targeting Destination { get; }
-    public ISpellEffect SpellEffect { get; }
-    public int ExecutionCycle { get; private set; }
-
-    public Spell(CombatObject source, ISpellEffect spellEffect)
-    {
-        Source = source;
-        Destination = new(Source);
-        SpellEffect = spellEffect;
-        ExecutionCycle = 0;
-    }
-
-    public void IncrementExecutionCycle()
-    {
-        ExecutionCycle += 1;
-    }
-}
-
-/// <summary>
-/// Configuration for scheduling an upcoming attack via a timer
-/// </summary>
-public class ScheduledSpell
-{
-    public static readonly ISpellSchedule EmptySpellSchedule = new EmptySpellSchedule();
-    public static readonly ScheduledSpell Empty = new(Spell.Empty, TimeTracker.Empty);
-    public Spell Spell { get; }
-    public TimeTracker Timer { get; }
-    public int Casts { get; private set; }
-
-    public ScheduledSpell(Spell spell, TimeTracker timer)
-    {
-        Spell = spell;
-        Timer = timer;
-        Casts = 0;
-    }
-
-    public void ScheduleFollowUpSpellEffects()
-    {
-        List<TimeSpan> followUpEffects = Spell.SpellEffect.FollowUpTimeStamps();
-        if (Casts < followUpEffects.Count)
-        {
-            TimeSpan timeStamp = followUpEffects[Casts];
-            Timer.ScheduleNewActivationTime(timeStamp);
-            Casts += 1;
-        }
-        else
-        {
-            Timer.RemoveActivationTime();
-        }
-    }
-}
-
-public class SpellScheduleGenerator
-{
-    public CombatObject Source { get; }
-    public List<ScheduledSpell> ScheduledSpells { get; }
-
-    public SpellScheduleGenerator()
-    {
-        Source = CombatObject.Empty;
-        ScheduledSpells = new();
-    }
-
-    public void Schedule(ISpellEffect spellEffect, int minute, int second, int millisecond)
-    {
-        Spell spell = new Spell(Source, spellEffect);
-        TimeTracker timer = TimeTracker.CreateFromTimeStamp(minute, second, millisecond);
-        ScheduledSpell scheduledSpell = new(spell, timer);
-        ScheduledSpells.Add(scheduledSpell);
-    }
-}
-
-public interface ISpellSchedule
-{
-    List<Tuple<int, int, int, ISpellEffect>> Load();
-}
-
-public class EmptySpellSchedule : ISpellSchedule
-{
-    public static readonly ISpellSchedule Empty = new EmptySpellSchedule();
-    public List<Tuple<int, int, int, ISpellEffect>> Load()
-    {
-        return new();
-    }
-}
-
-public class SpellSchedule0001 : ISpellSchedule
-{
-    public List<Tuple<int, int, int, ISpellEffect>> Load()
-    {
-        return new List<Tuple<int, int, int, ISpellEffect>>
-        {
-            new (0, 0, 0, new EmptySpellEffect()),
-            new (0, 2, 500, new EmptySpellEffect()),
-        };
-    }
-}
-
-/// <summary>
-/// Handles whether or not an attack should be initiated
-/// </summary>
-public class CombatScript
-{
-    public static readonly CombatScript Empty = new(CombatObject.Empty, ScheduledSpell.EmptySpellSchedule);
-    public CombatObject Source { get; }
-    public ISpellSchedule SpellSchedule { get; }
-    public List<ScheduledSpell> ScheduledSpells { get; private set; }
-    public List<Spell> SpellQueue { get; private set; }
-    public CombatScript(CombatObject source, ISpellSchedule spellSchedule)
-    {
-        Source = source;
-        SpellSchedule = spellSchedule;
-        ScheduledSpells = new();
-        SpellQueue = new();
-    }
-
-    public void PopulateSpellQueue(TimeSpan externalTimer)
-    {
-        SpellQueue.Clear();
-        ListenForPlayerInput();
-        foreach (var scheduledSpell in ScheduledSpells)
-        {
-            scheduledSpell.Timer.Update(externalTimer);;
-            while (scheduledSpell.Timer.IsActivationTimeStampReached())
-            {
-                SpellQueue.Add(scheduledSpell.Spell);
-                scheduledSpell.ScheduleFollowUpSpellEffects();
-            }
-        }
-    }
-
-    public void ValidateSpellQueue(CombatObject root)
-    {
-        // Iterate backwards to safely remove elements
-        for (int i = SpellQueue.Count - 1; i >= 0; i--)
-        {
-            var spell = SpellQueue[i];
-            var destination = spell.Destination;
-            spell.SpellEffect.SelectTargets(destination, root);
-            if (!SpellCastIsValid(spell))
-            {
-                SpellQueue.RemoveAt(i);
-            }
-        }
-    }
-
-    public void ExecuteSpellQueue(CombatSystem combatSystem)
-    {
-        foreach (var spell in SpellQueue)
-        {
-            combatSystem.StartAttack(spell);
-            spell.IncrementExecutionCycle();
-        }
-    }
-
-    public void LoadScheduledSpells()
-    {
-        var schedule = SpellSchedule.Load();
-        foreach (var config in schedule)
-        {
-            int minute = config.Item1;
-            int second = config.Item2;
-            int millisecond = config.Item3;
-            ISpellEffect spellEffect = config.Item4;
-            Schedule(Source, minute, second, millisecond, spellEffect);
-        }
-    }
-
-    public void Schedule(CombatObject source, int minute, int second, int millisecond, ISpellEffect spellEffect)
-    {
-        Spell spell = new(source, spellEffect);
-        TimeTracker timer = TimeTracker.CreateFromTimeStamp(minute, second, millisecond);
-        ScheduledSpell scheduledSpell = new(spell, timer);
-        ScheduledSpells.Add(scheduledSpell);
-    }
-
-    private static bool SpellCastIsValid(Spell spell)
-    {
-        return true;
-    }
-
-    private static void ListenForPlayerInput()
-    {
-        //Empty;
-    }
-}
-
-/// <summary>
 /// Contains combat units and controls the flow of attacks
 /// </summary>
 public class CombatEncounter
@@ -386,9 +113,6 @@ public class CombatEncounter
     {
         if (!GameIsPaused)
         {
-            Root.VisitAllCombatScripts(script => script.PopulateSpellQueue(EncounterTimer));
-            Root.VisitAllCombatScripts(script => script.ValidateSpellQueue(Root));
-            Root.VisitAllCombatScripts(script => script.ExecuteSpellQueue(CombatSystem));
             Root.VisitAllScheduledSpells(script => script.AttemptSpellCast(EncounterTimer, CombatSystem));
             Root.VisitDescendants(script => script.IncrementTimeSpentInEncounter(updateInterval));
             EncounterTimer += updateInterval;
@@ -422,8 +146,7 @@ public class CombatObject
     public bool HasHP { get; private set; }
     public float MaxHP { get; set; }
     public float CurrentHP { get; private set; }
-    public List<NewSpell> ScheduledSpells { get; set; }
-    public List<CombatScript> CombatScripts { get; private set; }
+    public List<Spell> ScheduledSpells { get; set; }
     public CombatObject Parent { get; private set; }
     public List<CombatObject> Children { get; private set; }
     public CombatObject()
@@ -436,7 +159,6 @@ public class CombatObject
         MaxHP = 1;
         CurrentHP = MaxHP;
         ScheduledSpells = new();
-        CombatScripts = new();
         Parent = Empty;
         Children = new();
     }
@@ -450,21 +172,9 @@ public class CombatObject
         }
     }
 
-    public void VisitAllCombatScripts(Action<CombatScript> action)
+    public void VisitAllScheduledSpells(Action<Spell> action)
     {
-        foreach (CombatScript script in CombatScripts)
-        {
-            action(script); // Apply action to each CombatScript in current object
-        }
-        foreach (CombatObject child in Children)
-        {
-            child.VisitAllCombatScripts(action); // Recursively repeat on children
-        }
-    }
-
-    public void VisitAllScheduledSpells(Action<NewSpell> action)
-    {
-        foreach (NewSpell script in ScheduledSpells)
+        foreach (Spell script in ScheduledSpells)
         {
             action(script); // Apply action to each CombatScript in current object
         }
@@ -485,11 +195,7 @@ public class CombatObject
 
     public void LoadCombatScript(INpc npcTemplate)
     {
-        ISpellSchedule spellSchedule = npcTemplate.SpellSchedule();
-        CombatScript combatScript = new(this, spellSchedule);
-        CombatScripts.Add(combatScript);
-        // new
-        NewSpell spell = npcTemplate.Spell();
+        Spell spell = npcTemplate.Spell();
         ScheduledSpells.Add(spell);
     }
 
@@ -519,16 +225,16 @@ public class CombatObject
     }
 }
 
-public class NewSpell
+public class Spell
 {
-    public static readonly NewSpell Empty = new(CombatObject.Empty, EmptySpellEffect.Empty, TimeSpan.Zero);
+    public static readonly Spell Empty = new(CombatObject.Empty, EmptySpellEffect.Empty, TimeSpan.Zero);
     public CombatObject Source { get; }
     public Targeting Destination { get; }
     public ISpellEffect SpellEffect { get; }
     public TimeSpan ActivationTimeStamp { get; }
     public bool HasBeenCast { get; private set; }
 
-    public NewSpell(CombatObject source, ISpellEffect spellEffect, TimeSpan timeStamp)
+    public Spell(CombatObject source, ISpellEffect spellEffect, TimeSpan timeStamp)
     {
         Source = source;
         Destination = new(Source);
@@ -581,24 +287,21 @@ public interface INpc
 {
     string NpcID();
     float BaseHP();
-    ISpellSchedule SpellSchedule();
-    NewSpell Spell();
+    Spell Spell();
 }
 
 public class EmptyNpc : INpc
 {
     public string NpcID() => "Npc0000";
     public float BaseHP() => 9999;
-    public ISpellSchedule SpellSchedule() => new EmptySpellSchedule();
-    public NewSpell Spell() => NewSpell.Empty;
+    public Spell Spell() => GlobalNameSpace.Spell.Empty;
 }
 
 public class Npc0001 : INpc
 {
     public string NpcID() => "Npc0001";
     public float BaseHP() => 20;
-    public ISpellSchedule SpellSchedule() => new SpellSchedule0001();
-    public NewSpell Spell() => NewSpell.Empty;
+    public Spell Spell() => GlobalNameSpace.Spell.Empty;
 }
 
 /// <summary>
@@ -678,21 +381,12 @@ public class CombatPacket
         ExecutionCycle = 0;
     }
 
-    public void LoadSpell(NewSpell spell)
+    public void LoadSpell(Spell spell)
     {
         Source = spell.Source;
         Destination = spell.Destination;
         Targets = spell.Destination.TargetedCombatObjects;
         SpellEffect = spell.SpellEffect;
-    }
-
-    public void LoadLegacySpell(Spell spell)
-    {
-        Source = spell.Source;
-        Destination = spell.Destination;
-        Targets = spell.Destination.TargetedCombatObjects;
-        SpellEffect = spell.SpellEffect;
-        ExecutionCycle = spell.ExecutionCycle;
     }
 
     public void ResetPacket()
@@ -757,18 +451,10 @@ public class CombatSystem
         combatManager = new CombatManager(10); // Example pool size
     }
 
-    public void CastSpell(NewSpell spell)
+    public void CastSpell(Spell spell)
     {
         var packet = combatManager.RequestPacket();
         packet.LoadSpell(spell);
-        HandleAttack(packet);
-        combatManager.ReleasePacket(packet);
-    }
-
-    public void StartAttack(Spell spell)
-    {
-        var packet = combatManager.RequestPacket();
-        packet.LoadLegacySpell(spell);
         HandleAttack(packet);
         combatManager.ReleasePacket(packet);
     }
