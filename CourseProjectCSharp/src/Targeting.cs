@@ -3,24 +3,35 @@ using System.Collections.Generic;
 
 namespace GlobalNameSpace;
 
-public class TargetAllEnemies : ISpellTargeting
+public interface ISpellTargeting
 {
+    string TargetingID();
+    List<CombatObject> Execute(Targeting destination, CombatObject root);
+}
+
+public class EmptySpellTargeting : ISpellTargeting
+{
+    public string TargetingID() => "targeting_empty";
     public List<CombatObject> Execute(Targeting destination, CombatObject root)
     {
-        CombatObject source = destination.Source;
-        Func<CombatObject, bool> condition;
-        if (!source.IsEnemy) // source is allied, target enemies
-        {
-            condition = combatObject =>
-                combatObject.IsEnemy &&
-                combatObject.HasHP;
-        }
-        else // source is enemy, target allies
-        {
-            condition = combatObject =>
-                !combatObject.IsEnemy &&
-                combatObject.HasHP;
-        }
-        return root.FindMatches(condition);
+        return CombatObject.CreateEmpty().Children;
+    }
+}
+
+public class TargetSelf : ISpellTargeting
+{
+    public string TargetingID() => "targeting_self";
+    public List<CombatObject> Execute(Targeting destination, CombatObject root)
+    {
+        return new() {destination.Source};
+    }
+}
+
+public class TargetAllEnemies : ISpellTargeting
+{
+    public string TargetingID() => "targeting_all_enemies";
+    public List<CombatObject> Execute(Targeting destination, CombatObject root)
+    {
+        return root.FindMatches(destination.Source.MemberOfEnemyTeam());
     }
 }

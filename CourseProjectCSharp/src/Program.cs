@@ -12,8 +12,14 @@ public class Program
     static void Main(string[] args)
     {
         Console.WriteLine("Hello World!"); // I am happy now :)
-        CombatEncounter encounter = new();
+        CombatObject globalRoot = CombatObject.CreateEmpty();
+        Encounter encounter = new(globalRoot);
         encounter.PlayerTeam.SpawnChild(new TestUnit());
-        encounter.EnemyTeam.SpawnChild(new TestUnit());
+        CombatObject child = encounter.EnemyTeam.SpawnChild(new TestUnit());
+        child.IsOnPlayersTeam = true;
+        while (encounter.GameIsOngoing())
+        {
+            encounter.ProcessCombat();
+        }
     }
 }
