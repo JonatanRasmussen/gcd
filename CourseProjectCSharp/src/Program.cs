@@ -12,5 +12,8 @@ public class Program
     static void Main(string[] args)
     {
         Console.WriteLine("Hello World!"); // I am happy now :)
+        CombatEncounter encounter = new();
+        encounter.PlayerTeam.SpawnChild(new TestUnit());
+        encounter.EnemyTeam.SpawnChild(new TestUnit());
     }
 }

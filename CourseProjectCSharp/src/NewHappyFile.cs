@@ -116,134 +116,7 @@ public class CombatResources
     public void ReduceCurrentHP(float damage)
     {
         CurrentHP -= damage;
-    }
-}
-
-/// <summary>
-/// A unit that is part of combat and targetable by spells
-/// </summary>
-public class CombatObject
-{
-    public static readonly CombatObject Empty = new(null);
-    public static readonly float DefaultPlayerHP = 1000;
-    public Position Position { get; private set; }
-    public Targeting Targeting { get; private set; }
-    public CombatResources Resources { get; }
-    public TimeSpan TimeAlive { get; private set; }
-    public bool IsOnFirstServerTick { get; private set; }
-    public bool IsEnemy { get; private set; }
-    public bool HasHP { get; private set; }
-    public float MaxHP { get; set; }
-    public float CurrentHP { get; private set; }
-    public List<ScheduledSpell> ScheduledSpells { get; set; }
-    public List<CombatObject> Children { get; }
-    public CombatObject Parent { get; private set; }
-    public CombatObject(CombatObject? parent)
-    {
-        Position = new(this);
-        Targeting = new(this);
-        Resources = new(this);
-        TimeAlive = TimeSpan.Zero;
-        IsEnemy = false;
-        HasHP = false;
-        MaxHP = 1;
-        CurrentHP = MaxHP;
-        ScheduledSpells = new();
-        Children = new();
-        Parent = parent ?? this;
-    }
-
-    public void VisitDescendants(Action<CombatObject> action)
-    {
-        action(this); // Perform action on current object
-        foreach (CombatObject child in Children)
-        {
-            child.VisitDescendants(action); // Recursively act on each child
-        }
-    }
-
-    public List<CombatObject> FindMatches(Func<CombatObject, bool> condition)
-    {
-        List<CombatObject> matchingCombatObjects = new();
-        void addActionIfMatch(CombatObject combatObject)
-        {
-            if (condition(combatObject))
-            {
-                matchingCombatObjects.Add(combatObject);
-            }
-        }
-        VisitDescendants(addActionIfMatch); // Resursively search each child
-        return matchingCombatObjects;
-    }
-
-    public List<ScheduledSpell> FindMatchingSpells(Func<ScheduledSpell, bool> condition)
-    {
-        List<ScheduledSpell> matchingSpells = new List<ScheduledSpell>();
-        void addSpellIfMatch(CombatObject combatObject)
-        {
-            foreach (ScheduledSpell scheduledSpell in combatObject.ScheduledSpells)
-            {
-                if (condition(scheduledSpell))
-                {
-                    matchingSpells.Add(scheduledSpell);
-                }
-            }
-            foreach (CombatObject child in combatObject.Children)
-            {
-                addSpellIfMatch(child); // Recursively search each child
-            }
-        }
-        addSpellIfMatch(this); // Start search from this CombatObject
-        return matchingSpells;
-    }
-
-    public void SpawnChild(INpc childTemplate)
-    {
-        CombatObject child = new(this);
-        ScheduledSpell scheduledSpell = childTemplate.OpeningSpell();
-        child.ScheduleSpell(scheduledSpell);
-        Resources.CopyFromTemplate(childTemplate.Resources());
-        ScheduleSpell(childTemplate.OpeningSpell());
-    }
-
-    public void ScheduleSpell(ScheduledSpell scheduledSpell)
-    {
-        scheduledSpell.AssignSource(this);
-        ScheduledSpells.Add(scheduledSpell);
-    }
-
-    public void IncrementTimeAlive(TimeSpan deltaTime)
-    {
-        IsOnFirstServerTick = false;
-        TimeAlive += deltaTime;
-    }
-
-
-    public void IncrementSpellTimers(TimeSpan deltaTime)
-    {
-        foreach (ScheduledSpell scheduledSpell in ScheduledSpells)
-        {
-            scheduledSpell.IncrementTimer(deltaTime);
-            scheduledSpell.UpdateCastStatus();
-        }
-    }
-
-    public void ClearFinishedSpells()
-    {
-        // Traverse the list backwards to safely remove elements without causing index errors
-        for (int i = ScheduledSpells.Count - 1; i >= 0; i--)
-        {
-            ScheduledSpell scheduledSpell = ScheduledSpells[i];
-            if (scheduledSpell.SpellCastIsFinished())
-            {
-                ScheduledSpells.Remove(scheduledSpell);
-            }
-        }
-    }
-
-    public bool IsRoot()
-    {
-        return Parent == this;
+        Console.WriteLine($"{CombatObject.NpcID} received {damage} damage! HP is now: {CurrentHP}");
     }
 }
 
@@ -379,6 +252,147 @@ public class SpellDetails
     }
 }
 
+
+/// <summary>
+/// A unit that is part of combat and targetable by spells
+/// </summary>
+public class CombatObject
+{
+    public static readonly CombatObject Empty = new(null);
+    public static readonly float DefaultPlayerHP = 1000;
+    public static readonly string DefaultNpcID = "default_npc_id";
+    public string NpcID { get; set; }
+    public Position Position { get; private set; }
+    public Targeting Targeting { get; private set; }
+    public CombatResources Resources { get; }
+    public TimeSpan TimeAlive { get; private set; }
+    public bool IsOnFirstServerTick { get; private set; }
+    public bool IsEnemy { get; private set; }
+    public bool HasHP { get; private set; }
+    public float MaxHP { get; set; }
+    public float CurrentHP { get; private set; }
+    public List<ScheduledSpell> ScheduledSpells { get; set; }
+    public List<CombatObject> Children { get; }
+    public CombatObject Parent { get; private set; }
+    public CombatObject(CombatObject? parent)
+    {
+        NpcID = DefaultNpcID;
+        Position = new(this);
+        Targeting = new(this);
+        Resources = new(this);
+        TimeAlive = TimeSpan.Zero;
+        IsEnemy = false;
+        HasHP = false;
+        MaxHP = 1;
+        CurrentHP = MaxHP;
+        ScheduledSpells = new();
+        Children = new();
+        Parent = parent ?? this;
+    }
+
+    public void VisitDescendants(Action<CombatObject> action)
+    {
+        action(this); // Perform action on current object
+        foreach (CombatObject child in Children)
+        {
+            child.VisitDescendants(action); // Recursively act on each child
+        }
+    }
+
+    public List<CombatObject> FindMatches(Func<CombatObject, bool> condition)
+    {
+        List<CombatObject> matchingCombatObjects = new();
+        void addActionIfMatch(CombatObject combatObject)
+        {
+            if (condition(combatObject))
+            {
+                matchingCombatObjects.Add(combatObject);
+            }
+        }
+        VisitDescendants(addActionIfMatch); // Resursively search each child
+        return matchingCombatObjects;
+    }
+
+    public List<ScheduledSpell> FindMatchingSpells(Func<ScheduledSpell, bool> condition)
+    {
+        List<ScheduledSpell> matchingSpells = new List<ScheduledSpell>();
+        void addSpellIfMatch(CombatObject combatObject)
+        {
+            foreach (ScheduledSpell scheduledSpell in combatObject.ScheduledSpells)
+            {
+                if (condition(scheduledSpell))
+                {
+                    matchingSpells.Add(scheduledSpell);
+                }
+            }
+            foreach (CombatObject child in combatObject.Children)
+            {
+                addSpellIfMatch(child); // Recursively search each child
+            }
+        }
+        addSpellIfMatch(this); // Start search from this CombatObject
+        return matchingSpells;
+    }
+
+    public CombatObject SpawnChild(INpc npc)
+    {
+        CombatObject child = new(this)
+        {
+            NpcID = npc.NpcID()
+        };
+        ScheduledSpell scheduledSpell = npc.OpeningSpell();
+        child.ScheduleSpell(scheduledSpell);
+        Resources.CopyFromTemplate(npc.Resources());
+        ScheduleSpell(npc.OpeningSpell());
+        return child;
+    }
+
+    public void ScheduleSpell(ScheduledSpell scheduledSpell)
+    {
+        scheduledSpell.AssignSource(this);
+        ScheduledSpells.Add(scheduledSpell);
+    }
+
+    public void IncrementTimeAlive(TimeSpan deltaTime)
+    {
+        IsOnFirstServerTick = false;
+        TimeAlive += deltaTime;
+    }
+
+
+    public void IncrementSpellTimers(TimeSpan deltaTime)
+    {
+        foreach (ScheduledSpell scheduledSpell in ScheduledSpells)
+        {
+            scheduledSpell.IncrementTimer(deltaTime);
+            scheduledSpell.UpdateCastStatus();
+        }
+    }
+
+    public void ClearFinishedSpells()
+    {
+        // Traverse the list backwards to safely remove elements without causing index errors
+        for (int i = ScheduledSpells.Count - 1; i >= 0; i--)
+        {
+            ScheduledSpell scheduledSpell = ScheduledSpells[i];
+            if (scheduledSpell.SpellCastIsFinished())
+            {
+                ScheduledSpells.Remove(scheduledSpell);
+            }
+        }
+    }
+
+    public bool HasName(string name)
+    {
+        return NpcID == name;
+    }
+
+    public bool IsRoot()
+    {
+        return Parent == this;
+    }
+}
+
 /// <summary>
 /// Contains combat units and controls the flow of attacks
 /// </summary>
@@ -388,9 +402,11 @@ public class CombatEncounter
     public event Action<CombatPacket>? OnAttackComplete;
     public static readonly CombatEncounter Empty = new();
     public static readonly int UpdatesPerSecond = 20;
+    public CombatObject Root { get; private set; }
+    public CombatObject PlayerTeam { get; private set; }
+    public CombatObject EnemyTeam { get; private set; }
     public TimeSpan EncounterTimer { get; private set; }
     public TimeSpan UpdateInterval { get; }
-    public CombatObject Root { get; private set; }
     public bool GameIsPaused { get; private set; }
     public bool EncounterIsPaused { get; private set; }
     private readonly CombatManager combatManager;
@@ -398,9 +414,12 @@ public class CombatEncounter
 
     public CombatEncounter()
     {
+        CombatObject globalRoot = new(null);
+        Root = globalRoot.SpawnChild(new EncounterRoot());
+        PlayerTeam = Root.SpawnChild(new PlayerTeam());
+        EnemyTeam = Root.SpawnChild(new EnemyTeam());
         EncounterTimer = TimeSpan.Zero;
         UpdateInterval = CalculateUpdateInterval(UpdatesPerSecond);
-        Root = new(null);
         GameIsPaused = false;
         EncounterIsPaused = false;
         combatManager = new CombatManager(defaultPoolSize);
@@ -472,6 +491,12 @@ public class CombatEncounter
         CastSpell(source, spell);
     }
 
+    public List<CombatObject> FindDescendantByNpcID(CombatObject parent, string npcID)
+    {
+        bool condition(CombatObject combatObject) => combatObject.HasName(npcID);
+        return parent.FindMatches(condition);
+    }
+
     public void ProcessPacket(CombatPacket packet)
     {
         OnAttackStart?.Invoke(packet);
@@ -484,7 +509,7 @@ public class CombatEncounter
 
     private static TimeSpan CalculateUpdateInterval(int updatesPerSecond)
     {
-        return TimeSpan.FromTicks(TimeSpan.TicksPerSecond / updatesPerSecond);
+        return TimeSpan.FromTicks(TimeSpan.TicksPerSecond / (updatesPerSecond+1));
     }
 }
 
@@ -606,65 +631,6 @@ public class EmptySpellEffect : ISpellEffect
     }
 }
 
-public class DealDamage : ISpellEffect
-{
-    public float Damage { get; set; }
-    public DealDamage(float damage)
-    {
-        Damage = damage;
-    }
-    public void Execute(CombatPacket packet)
-    {
-        foreach (CombatObject target in packet.Targets)
-        {
-            target.Resources.ReduceCurrentHP(Damage);
-        }
-    }
-}
-
-public class SpawnChild : ISpellEffect
-{
-    public INpc Child { get; set; }
-    public SpawnChild(INpc child)
-    {
-        Child = child;
-    }
-    public void Execute(CombatPacket packet)
-    {
-        foreach (CombatObject target in packet.Targets)
-        {
-            target.SpawnChild(Child);
-        }
-    }
-}
-
-public class ScheduleSpell : ISpellEffect
-{
-    public ScheduledSpell ScheduledSpell { get; set; }
-    public ScheduleSpell(ScheduledSpell scheduledSpell)
-    {
-        ScheduledSpell = scheduledSpell;
-    }
-    public void Execute(CombatPacket packet)
-    {
-        if (packet.Targets.Count == 1) // Reuse existing spell instance
-        {
-            packet.Targets[0].ScheduleSpell(ScheduledSpell);
-        }
-        else // Avoid all targets taking ownership of the same spell instance
-        {
-            foreach (CombatObject target in packet.Targets)
-            {
-                string spellID = ScheduledSpell.Spell.SpellID();
-                ISpell spell = SpellRegistry.CreateSpellInstance(spellID);
-                ScheduledSpell scheduledSpell = new(spell);
-                scheduledSpell.DelayActivation(ScheduledSpell.ActivationTimeStamp);
-                target.ScheduleSpell(scheduledSpell);
-            }
-        }
-    }
-}
-
 public interface ISpellTargeting
 {
     List<CombatObject> Execute(Targeting destination, CombatObject root);
@@ -676,28 +642,6 @@ public class EmptySpellTargeting : ISpellTargeting
     public List<CombatObject> Execute(Targeting destination, CombatObject root)
     {
         return CombatObject.Empty.Children;
-    }
-}
-
-public class TargetAllEnemies : ISpellTargeting
-{
-    public List<CombatObject> Execute(Targeting destination, CombatObject root)
-    {
-        CombatObject source = destination.Source;
-        Func<CombatObject, bool> condition;
-        if (!source.IsEnemy) // source is allied, target enemies
-        {
-            condition = combatObject =>
-                combatObject.IsEnemy &&
-                combatObject.HasHP;
-        }
-        else // source is enemy, target allies
-        {
-            condition = combatObject =>
-                !combatObject.IsEnemy &&
-                combatObject.HasHP;
-        }
-        return root.FindMatches(condition);
     }
 }
 
@@ -713,15 +657,6 @@ public class EmptySpell : ISpell
 {
     public static readonly ISpell Empty = new EmptySpell();
     public string SpellID() => "empty_spell";
-    public ISpellTargeting Targeting() => EmptySpellTargeting.Empty;
-    public SpellDetails Details() => SpellDetails.Empty;
-    public List<ISpellEffect> Effects() => new();
-}
-
-public class Spell1 : ISpell
-{
-    public static readonly ISpell Empty = new EmptySpell();
-    public string SpellID() => "spell_1";
     public ISpellTargeting Targeting() => EmptySpellTargeting.Empty;
     public SpellDetails Details() => SpellDetails.Empty;
     public List<ISpellEffect> Effects() => new();
